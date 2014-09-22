@@ -23,6 +23,7 @@ struct ext_transition_t
     std::vector<int> sv_read;
     std::vector<int> sv_may_write;
     std::vector<int> sv_must_write;
+    std::vector<int> sv_actions_read;
 };
 
 typedef enum {GUARD_EXPR, GUARD_PC, GUARD_CHAN, GUARD_COMMITED_FIRST} guard_type;
@@ -107,7 +108,7 @@ struct dve_compiler: public dve_explicit_system_t
 
     int  count_state_variables();
     void analyse_expression( dve_expression_t & expr, ext_transition_t &ext_transition, std::vector<int> &dep );
-    void output_dependency_comment( ext_transition_t &ext_transition );
+    void output_dependency_comment( ext_transition_t &ext_transition, bool condition );
     void mark_dependency ( size_int_t gid, int type, int idx, std::vector<int> &dep);
     void analyse_transition_dependencies( ext_transition_t &ext_transition );
     void analyse_transition( dve_transition_t * transition,
@@ -229,7 +230,7 @@ struct dve_compiler: public dve_explicit_system_t
     void new_output_state();
 
     void gen_successors();
-    void gen_ltsmin_successors();
+    void gen_ltsmin_successors(bool condition);
     void gen_is_accepting();
     void gen_header();
     void gen_state_struct();

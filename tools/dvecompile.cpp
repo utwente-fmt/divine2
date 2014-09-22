@@ -421,7 +421,7 @@ void dve_compiler::gen_initial_state()
     }
 }
 
-void dve_compiler::output_dependency_comment( ext_transition_t &ext_transition )
+void dve_compiler::output_dependency_comment( ext_transition_t &ext_transition, bool condition )
 {
     // only for ltsmin
     if (!ltsmin)
@@ -430,30 +430,48 @@ void dve_compiler::output_dependency_comment( ext_transition_t &ext_transition )
     int count = count_state_variables();
     char buf[BUFLEN];
 
-    line();
-    append("// read:         " );
-    for(size_int_t i = 0; i < count; i++)
-    {
-        snprintf(buf, BUFLEN, "%s%d", ((i==0)?"":","), ext_transition.sv_read[i]);
-        append(buf);
-    }
-    line();
+    if (condition) {
+        line();
+        append("// read:         " );
+        for(size_int_t i = 0; i < count; i++)
+        {
+            snprintf(buf, BUFLEN, "%s%d", ((i==0)?"":","), ext_transition.sv_read[i]);
+            append(buf);
+        }
+        line();
 
-    append("// may-write:    " );
-    for(size_int_t i = 0; i < count; i++)
-    {
-        snprintf(buf, BUFLEN, "%s%d", ((i==0)?"":","), ext_transition.sv_may_write[i]);
-        append(buf);
-    }
-    line();
+        append("// actions_read: " );
+        for(size_int_t i = 0; i < count; i++)
+        {
+            snprintf(buf, BUFLEN, "%s%d", ((i==0)?"":","), ext_transition.sv_actions_read[i]);
+            append(buf);
+        }
+        line();
+    } else {
+        append("// actions_read: " );
+        for(size_int_t i = 0; i < count; i++)
+        {
+            snprintf(buf, BUFLEN, "%s%d", ((i==0)?"":","), ext_transition.sv_actions_read[i]);
+            append(buf);
+        }
+        line();
 
-    append("// must-write:   " );
-    for(size_int_t i = 0; i < count; i++)
-    {
-        snprintf(buf, BUFLEN, "%s%d", ((i==0)?"":","), ext_transition.sv_must_write[i]);
-        append(buf);
+        append("// may-write:    " );
+        for(size_int_t i = 0; i < count; i++)
+        {
+            snprintf(buf, BUFLEN, "%s%d", ((i==0)?"":","), ext_transition.sv_may_write[i]);
+            append(buf);
+        }
+        line();
+
+        append("// must-write:   " );
+        for(size_int_t i = 0; i < count; i++)
+        {
+            snprintf(buf, BUFLEN, "%s%d", ((i==0)?"":","), ext_transition.sv_must_write[i]);
+            append(buf);
+        }
+        line();
     }
-    line();
 }
 
 void dve_compiler::analyse_expression( dve_expression_t & expr, ext_transition_t &ext_transition, std::vector<int> &dep)
@@ -481,17 +499,19 @@ void dve_compiler::analyse_expression( dve_expression_t & expr, ext_transition_t
                 mark_dependency(expr.get_ident_gid(), state_creator_t::VARIABLE, (*expr.left()).get_value(), dep);
             } else {
                 // some expression, mark all & continue analysis
-                if (dep == ext_transition.sv_may_write || dep == ext_transition.sv_read) {
+                if (dep == ext_transition.sv_may_write || dep == ext_transition.sv_read || dep == ext_transition.sv_actions_read) {
                     mark_dependency(expr.get_ident_gid(), state_creator_t::VARIABLE, -1, dep);
                 }
                 if (dep == ext_transition.sv_may_write && may_write_add_read) {
                     mark_dependency(expr.get_ident_gid(), state_creator_t::VARIABLE, -1, ext_transition.sv_read);
+                    mark_dependency(expr.get_ident_gid(), state_creator_t::VARIABLE, -1, ext_transition.sv_actions_read);
                 }
                 if ((*expr.left()).get_operator() == T_ASSIGNMENT) {
                     analyse_expression(*expr.left(), ext_transition, ext_transition.sv_may_write);
                     analyse_expression(*expr.left(), ext_transition, ext_transition.sv_must_write);
                 } else if (dep == ext_transition.sv_may_write) {
                     analyse_expression(*expr.left(), ext_transition, ext_transition.sv_read);
+                    analyse_expression(*expr.left(), ext_transition, ext_transition.sv_actions_read);
                 } else if (dep != ext_transition.sv_must_write) {
                     analyse_expression(*expr.left(), ext_transition, dep);
                 }
@@ -501,18 +521,23 @@ void dve_compiler::analyse_expression( dve_expression_t & expr, ext_transition_t
         case T_PLUS: case T_MINUS: case T_MULT: case T_DIV: case T_MOD:
         case T_AND: case T_OR: case T_XOR: case T_LSHIFT: case T_RSHIFT:
         case T_BOOL_AND: case T_BOOL_OR:
-            analyse_expression( *expr.left(), ext_transition, ext_transition.sv_read );
-            analyse_expression( *expr.right(), ext_transition, ext_transition.sv_read );
+            if (dep == ext_transition.sv_read || dep == ext_transition.sv_actions_read) {
+                analyse_expression( *expr.left(), ext_transition, dep );
+                analyse_expression( *expr.right(), ext_transition, dep );
+            }
             break;
         case T_ASSIGNMENT:
             analyse_expression( *expr.left(), ext_transition, ext_transition.sv_may_write );
             analyse_expression( *expr.left(), ext_transition, ext_transition.sv_must_write );
             analyse_expression( *expr.right(), ext_transition, ext_transition.sv_read );
+            analyse_expression( *expr.right(), ext_transition, ext_transition.sv_actions_read );
             break;
         case T_DOT:
             // dot addes an explicit == (see code), thus must be read
             mark_dependency(parent_table->get_state(expr.get_ident_gid())->get_process_gid(),
                             state_creator_t::PROCESS_STATE, -1, ext_transition.sv_read);
+            mark_dependency(parent_table->get_state(expr.get_ident_gid())->get_process_gid(),
+                            state_creator_t::PROCESS_STATE, -1, ext_transition.sv_actions_read);
             break;
         case T_IMPLY:
             analyse_expression( *expr.left(), ext_transition, dep );
@@ -544,6 +569,7 @@ void dve_compiler::analyse_transition_dependencies( ext_transition_t &ext_transi
     ext_transition.sv_read.resize(count);
     ext_transition.sv_may_write.resize(count);
     ext_transition.sv_must_write.resize(count);
+    ext_transition.sv_actions_read.resize(count);
 
     // guard
 
@@ -571,6 +597,8 @@ void dve_compiler::analyse_transition_dependencies( ext_transition_t &ext_transi
         {
             mark_dependency(ext_transition.first->get_channel_gid(),
                             state_creator_t::CHANNEL_BUFFER, -1, ext_transition.sv_read);
+            mark_dependency(ext_transition.first->get_channel_gid(),
+                            state_creator_t::CHANNEL_BUFFER, -1, ext_transition.sv_actions_read);
         }
     }
 
@@ -579,6 +607,8 @@ void dve_compiler::analyse_transition_dependencies( ext_transition_t &ext_transi
         // mark process as read/write?
         mark_dependency(ext_transition.property->get_process_gid(),
                         state_creator_t::PROCESS_STATE, -1, ext_transition.sv_read);
+        mark_dependency(ext_transition.property->get_process_gid(),
+                        state_creator_t::PROCESS_STATE, -1, ext_transition.sv_actions_read);
 
         // analyse ext_transition->property->get_guard
         if (ext_transition.property->get_guard())
@@ -599,6 +629,8 @@ void dve_compiler::analyse_transition_dependencies( ext_transition_t &ext_transi
                                 ext_transition.sv_must_write);
             analyse_expression( *(ext_transition.second->get_sync_expr_list_item(s)), ext_transition,
                                 ext_transition.sv_read);
+            analyse_expression( *(ext_transition.second->get_sync_expr_list_item(s)), ext_transition,
+                                ext_transition.sv_actions_read);
         }
     } else {
         int sm = ext_transition.first->get_sync_mode();
@@ -614,6 +646,8 @@ void dve_compiler::analyse_transition_dependencies( ext_transition_t &ext_transi
             {
                 analyse_expression( *(ext_transition.first->get_sync_expr_list_item(s)), ext_transition,
                                     ext_transition.sv_read);
+                analyse_expression( *(ext_transition.first->get_sync_expr_list_item(s)), ext_transition,
+                                    ext_transition.sv_actions_read);
             }
         }
         if (sm == SYNC_ASK_BUFFER)
@@ -621,6 +655,8 @@ void dve_compiler::analyse_transition_dependencies( ext_transition_t &ext_transi
             // mark entire channel
             mark_dependency(ext_transition.first->get_channel_gid(),
                             state_creator_t::CHANNEL_BUFFER, -1, ext_transition.sv_read);
+            mark_dependency(ext_transition.first->get_channel_gid(),
+                            state_creator_t::CHANNEL_BUFFER, -1, ext_transition.sv_actions_read);
             mark_dependency(ext_transition.first->get_channel_gid(),
                             state_creator_t::CHANNEL_BUFFER, -1, ext_transition.sv_may_write);
             mark_dependency(ext_transition.first->get_channel_gid(),
@@ -645,9 +681,12 @@ void dve_compiler::analyse_transition_dependencies( ext_transition_t &ext_transi
                     state_creator_t::PROCESS_STATE, -1, ext_transition.sv_must_write);
 
     // analyse ext_transition->first
-    for(size_int_t e = 0;e < ext_transition.first->get_effect_count();e++)
+    for(size_int_t e = 0;e < ext_transition.first->get_effect_count();e++) {
         analyse_expression( *(ext_transition.first->get_effect(e)), ext_transition,
         ext_transition.sv_read);
+        analyse_expression( *(ext_transition.first->get_effect(e)), ext_transition,
+        ext_transition.sv_actions_read);
+    }
 
     // analyse ext_transition->second?
     if (ext_transition.synchronized)
@@ -659,9 +698,12 @@ void dve_compiler::analyse_transition_dependencies( ext_transition_t &ext_transi
                         state_creator_t::PROCESS_STATE, -1, ext_transition.sv_must_write);
 
         // analyse ext_transition->second
-        for(size_int_t e = 0;e < ext_transition.second->get_effect_count();e++)
+        for(size_int_t e = 0;e < ext_transition.second->get_effect_count();e++) {
             analyse_expression( *(ext_transition.second->get_effect(e)), ext_transition,
             ext_transition.sv_read);
+            analyse_expression( *(ext_transition.second->get_effect(e)), ext_transition,
+            ext_transition.sv_actions_read);
+        }
     }
 
     if (have_property)
@@ -831,6 +873,8 @@ void dve_compiler::analyse()
 
 void dve_compiler::transition_guard( ext_transition_t *et, std::string in )
 {
+    output_dependency_comment(*et, true);
+
     if_begin( false );
 
     // ltsmin guard extension
@@ -940,7 +984,7 @@ void dve_compiler::transition_effect( ext_transition_t *et, std::string in, std:
     }
 
     // show dependency information in the source
-    output_dependency_comment(*et);
+    output_dependency_comment(*et, false);
 }
 
 void dve_compiler::new_output_state() {
@@ -977,7 +1021,7 @@ void dve_compiler::yield_state() {
     }
 }
 
-void dve_compiler::gen_ltsmin_successors()
+void dve_compiler::gen_ltsmin_successors(bool condition)
 {
     string in = "(*in)", out = "(*out)", space = "";
     bool some_commited_state = false;
@@ -1012,15 +1056,20 @@ void dve_compiler::gen_ltsmin_successors()
                         {
                             // only generate if not synchonized or synchonized with a committed transition
                             new_label();
-
-                            transition_guard( &*iter_ext_transition_vector, in );
-                            block_begin();
-                            new_output_state();
-                            transition_effect( &*iter_ext_transition_vector, in, out );
-                            yield_state();
-                            block_end();
-
-                            line("return states_emitted;");
+                            if (condition) { // generate get_successor
+                                block_begin();
+                                transition_guard( &*iter_ext_transition_vector, in );
+                                line("states_emitted = get_action(model, t, in, callback, arg);");
+                                block_end();
+                                line("return states_emitted;");
+                            } else {
+                                block_begin();
+                                new_output_state();
+                                transition_effect( &*iter_ext_transition_vector, in, out );
+                                yield_state();
+                                block_end();
+                                line("return states_emitted;");
+                            }
                         }
                     }
                 }
@@ -1047,29 +1096,36 @@ void dve_compiler::gen_ltsmin_successors()
                 {
 
                     new_label();
+                    if (condition) {
+                        block_begin();
+                        transition_guard( &*iter_ext_transition_vector, in );
+                        line("states_emitted = get_action(model, t, in, callback, arg);");
+                        block_end();
+                        line("return states_emitted;");
+                    } else {
 
-                    transition_guard( &*iter_ext_transition_vector, in );
-                    block_begin();
-                    if (some_commited_state)
-                    {
-                        // committed state
-                        if_begin( true );
+                        block_begin();
+                        if (some_commited_state)
+                        {
+                            // committed state
+                            if_begin( true );
 
-                        for(size_int_t p = 0; p < get_process_count(); p++)
-                            for(size_int_t c = 0; c < dynamic_cast<dve_process_t*>(get_process(p))->get_state_count(); c++)
-                                if(dynamic_cast<dve_process_t*>(get_process(p))->get_commited(c))
-                                    if_clause( in_state( p, c, in ) );
+                            for(size_int_t p = 0; p < get_process_count(); p++)
+                                for(size_int_t c = 0; c < dynamic_cast<dve_process_t*>(get_process(p))->get_state_count(); c++)
+                                    if(dynamic_cast<dve_process_t*>(get_process(p))->get_commited(c))
+                                        if_clause( in_state( p, c, in ) );
 
-                        if_end();
-                        line("    return 0;"); // bail out early
+                            if_end();
+                            line("    return 0;"); // bail out early
+                        }
+
+
+                        new_output_state();
+                        transition_effect( &*iter_ext_transition_vector, in, out );
+                        yield_state();
+                        block_end();
+                        line("return states_emitted;");
                     }
-
-
-                    new_output_state();
-                    transition_effect( &*iter_ext_transition_vector, in, out );
-                    yield_state();
-                    block_end();
-                    line("return states_emitted;");
                 }
             }
         }
@@ -1120,7 +1176,6 @@ void dve_compiler::gen_successors()
                             get_commited(iter_ext_transition_vector->second->get_state1_lid()) )
                         {
                             new_label();
-
                             transition_guard( &*iter_ext_transition_vector, in );
                             block_begin();
                             new_output_state();
@@ -1276,9 +1331,10 @@ void dve_compiler::print_generator()
 
         gen_is_accepting();
 
+        // generate get_action
         many = false;
         current_label = 0;
-        line( "extern \"C\" int get_successor( void* model, int t, const state_struct_t *in, void (*callback)(void* arg, transition_info_t *transition_info, state_struct_t *out, int *cpy), void *arg ) " );
+        line( "extern \"C\" int get_action( void* model, int t, const state_struct_t *in, void (*callback)(void* arg, transition_info_t *transition_info, state_struct_t *out, int *cpy), void *arg ) " );
         block_begin();
         line( "transition_info_t transition_info = { NULL, t, 0 };" );
         line( "(void)model; // ignore model" );
@@ -1289,7 +1345,7 @@ void dve_compiler::print_generator()
         for (int i = 0; i < count_state_variables(); i++) append ("1,");
         line("};");
         line( "goto switch_state;" );
-        gen_ltsmin_successors();
+        gen_ltsmin_successors(false);
         // switch block
         line( "switch_state: switch( t )" );
         block_begin();
@@ -1302,6 +1358,26 @@ void dve_compiler::print_generator()
         block_end();
         line();
 
+        // generate get_successor
+        many = false;
+        current_label = 0;
+        line( "extern \"C\" int get_successor( void* model, int t, const state_struct_t *in, void (*callback)(void* arg, transition_info_t *transition_info, state_struct_t *out, int *cpy), void *arg ) " );
+        block_begin();
+        line( "int states_emitted = 0;" );
+        line( "goto switch_state;" );
+        gen_ltsmin_successors(true);
+        // switch block
+        line( "switch_state: switch( t )" );
+        block_begin();
+        for(int i=0; i < current_label; i++)
+                line( "case " + fmt( i ) + ": goto l" + fmt( i ) + ";" );
+        line( "default: printf (\"Wrong group! Using greybox/long call + -l (DiVinE LTL semantics)? This combo is not implemented.\"); exit (-1);" );
+        block_end();
+        line("return 0;");
+        // end switch block
+        block_end();
+        line();
+        
         many = true;
         current_label = 0;
 
@@ -1900,6 +1976,7 @@ void dve_compiler::merge_dependent_expression(std::vector<guard>& guard, int sv_
         et.sv_read.resize(sv_count);
         et.sv_may_write.resize(sv_count);
         et.sv_must_write.resize(sv_count);
+        et.sv_actions_read.resize(sv_count);
         analyse_expression(*guard[i].expr.guard, et, et.sv_read);
         guard_matrix[i] = et.sv_read;
     }
@@ -1965,6 +2042,7 @@ void dve_compiler::gen_transition_info()
 
     // initialize read/write dependency vector
     std::vector<int> c_base_sv_read(sv_count);
+    std::vector<int> c_base_sv_actions_read(sv_count);
     std::vector<ext_transition_t> transitions;
     fill_transition_vector(transitions);
 
@@ -1975,6 +2053,8 @@ void dve_compiler::gen_transition_info()
                 has_commited = true;
                 mark_dependency(dynamic_cast<dve_process_t*>(get_process(i))->get_gid(),
                                 state_creator_t::PROCESS_STATE, -1, c_base_sv_read);
+                mark_dependency(dynamic_cast<dve_process_t*>(get_process(i))->get_gid(),
+                                state_creator_t::PROCESS_STATE, -1, c_base_sv_actions_read);
             }
 
 
@@ -2079,6 +2159,7 @@ void dve_compiler::gen_transition_info()
                 // use ext_transition dummy to store read/write vector
                 ext_transition_t et;
                 et.sv_read.resize(sv_count);
+                et.sv_actions_read.resize(sv_count);
                 et.sv_may_write.resize(sv_count);
                 et.sv_must_write.resize(sv_count);
                 analyse_expression(*guard[i].expr.guard, et, et.sv_read);
@@ -2176,6 +2257,8 @@ void dve_compiler::gen_transition_info()
     std::vector< std::vector<bool> > transition_variable_set(transitions.size());
     // compute read set of transition
     std::vector< std::vector<bool> > transition_read_set(transitions.size());
+    // compute actions read set of transition
+    std::vector< std::vector<bool> > transition_actions_read_set(transitions.size());
     // compute write set of transition
     std::vector< std::vector<bool> > transition_write_set(transitions.size());
     // compute sets
@@ -2189,6 +2272,8 @@ void dve_compiler::gen_transition_info()
         transition_read_set[i] = tmp2;
         std::vector<bool> tmp3(sv_count);
         transition_write_set[i] = tmp3;
+        std::vector<bool> tmp4(sv_count);
+        transition_actions_read_set[i] = tmp4;
 
         for(size_int_t j = 0; j < sv_count; j++)
         {
@@ -2206,6 +2291,8 @@ void dve_compiler::gen_transition_info()
             transition_variable_set[i][j] =  dep || current.sv_may_write[j];
             transition_read_set[i][j] =  dep;
             transition_write_set[i][j] =  current.sv_may_write[j];
+            transition_actions_read_set[i][j] = current.commited?current.sv_actions_read[j]:max(c_base_sv_actions_read[j], current.sv_actions_read[j]);            
+            
         }
     }
 
@@ -2243,6 +2330,27 @@ void dve_compiler::gen_transition_info()
     line(";");
     line();
 
+    // output action reads vectors
+    snprintf(buf, BUFLEN, "int actions_read[][%d] = ", sv_count);
+    line(buf);
+    block_begin();
+
+    for(size_int_t i = 0; i < transitions.size(); i++) {
+        ext_transition_t& current = transitions[i];
+        if (i!=0) { line(","); }
+        append("{" );
+        for(size_int_t j = 0; j < sv_count; j++)
+        {
+            snprintf(buf, BUFLEN, "%s%d", ((j==0)?"":","), transition_actions_read_set[i][j]?1:0 );
+            append(buf);
+        }
+        append("}" );
+    }
+    line();
+    block_end();
+    line(";");
+    line();   
+        
     // number of transitions
     line( "extern \"C\" int get_transition_count() " );
     block_begin();
@@ -2255,6 +2363,16 @@ void dve_compiler::gen_transition_info()
     line( "extern \"C\" const int* get_transition_read_dependencies(int t) " );
     block_begin();
     snprintf(buf, BUFLEN, "if (t>=0 && t < %zu) return transition_dependency[t][0];", transitions.size());
+    line(buf);
+    snprintf(buf, BUFLEN, "return NULL;");
+    line(buf);
+    block_end();
+    line();
+
+    // actions read dependencies
+    line( "extern \"C\" const int* get_transition_actions_read_dependencies(int t) " );
+    block_begin();
+    snprintf(buf, BUFLEN, "if (t>=0 && t < %zu) return actions_read[t];", transitions.size());
     line(buf);
     snprintf(buf, BUFLEN, "return NULL;");
     line(buf);
@@ -2797,6 +2915,7 @@ dve_compiler::extract_assigns ( ext_transition_t *et,
     ext_transition_t tmp;
     int count = count_state_variables();
     tmp.sv_read.resize(count);
+    tmp.sv_actions_read.resize(count);
     tmp.sv_may_write.resize(count);
     tmp.sv_must_write.resize(count);
 
@@ -2810,8 +2929,11 @@ dve_compiler::extract_assigns ( ext_transition_t *et,
             dve_expression_t& left = *et->first->get_sync_expr_list_item(s);
             dve_expression_t& right = *et->second->get_sync_expr_list_item(s);
             tmp.sv_read.clear();
+            tmp.sv_actions_read.clear();
             analyse_expression (left, tmp, tmp.sv_read);
             analyse_expression (right, tmp, tmp.sv_read);
+            analyse_expression (left, tmp, tmp.sv_actions_read);
+            analyse_expression (right, tmp, tmp.sv_actions_read);
             if (!dependent(tmp.sv_read, deps))
                 continue;
 
@@ -2828,8 +2950,11 @@ dve_compiler::extract_assigns ( ext_transition_t *et,
         int chan = et->first->get_channel_gid();
 
         tmp.sv_read.clear();
+        tmp.sv_actions_read.clear();
         mark_dependency(et->first->get_channel_gid(),
                         state_creator_t::CHANNEL_BUFFER, -1, tmp.sv_read);
+        mark_dependency(et->first->get_channel_gid(),
+                        state_creator_t::CHANNEL_BUFFER, -1, tmp.sv_actions_read);
         if (dependent(tmp.sv_read, deps)) {
             simple_predicate sp;
             if (sm == SYNC_EXCLAIM_BUFFER) {
@@ -2849,8 +2974,11 @@ dve_compiler::extract_assigns ( ext_transition_t *et,
     sp.variable_name = process_state( et->first->get_process_gid(), "out" );
     sp.variable_value = et->first->get_state2_lid();
     tmp.sv_read.clear();
+    tmp.sv_actions_read.clear();
     mark_dependency(et->first->get_process_gid(),
                     state_creator_t::PROCESS_STATE, -1, tmp.sv_read);
+    mark_dependency(et->first->get_process_gid(),
+                    state_creator_t::PROCESS_STATE, -1, tmp.sv_actions_read);
     if (dependent(tmp.sv_read, deps))
         p.push_back(sp);
 
@@ -2867,8 +2995,11 @@ dve_compiler::extract_assigns ( ext_transition_t *et,
         sp.variable_name = process_state( et->second->get_process_gid(), "out" );
         sp.variable_value = et->second->get_state2_lid();
         tmp.sv_read.clear();
+        tmp.sv_actions_read.clear();
         mark_dependency(et->second->get_process_gid(),
                         state_creator_t::PROCESS_STATE, -1, tmp.sv_read);
+        mark_dependency(et->second->get_process_gid(),
+                        state_creator_t::PROCESS_STATE, -1, tmp.sv_actions_read);
         if (dependent(tmp.sv_read, deps))
             p.push_back(sp);
 
@@ -2892,6 +3023,7 @@ dve_compiler::get_assignment ( dve_expression_t & expr,
     ext_transition_t tmp;
     int count = count_state_variables();
     tmp.sv_read.resize(count);
+    tmp.sv_actions_read.resize(count);
     tmp.sv_may_write.resize(count);
     tmp.sv_must_write.resize(count);
     if (expr.get_operator() == T_ASSIGNMENT) {
@@ -2899,6 +3031,7 @@ dve_compiler::get_assignment ( dve_expression_t & expr,
             return false;
 
         analyse_expression (*expr.left(), tmp, tmp.sv_read);
+        analyse_expression (*expr.left(), tmp, tmp.sv_actions_read);
         if (!dependent(tmp.sv_read, deps))
             return true; // no need to add
 
