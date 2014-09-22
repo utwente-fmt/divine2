@@ -21,7 +21,8 @@ struct ext_transition_t
     dve_transition_t *second;   // only when first transition is synchronized;
     dve_transition_t *property; // transition of property automaton
     std::vector<int> sv_read;
-    std::vector<int> sv_write;
+    std::vector<int> sv_may_write;
+    std::vector<int> sv_must_write;
 };
 
 typedef enum {GUARD_EXPR, GUARD_PC, GUARD_CHAN, GUARD_COMMITED_FIRST} guard_type;
