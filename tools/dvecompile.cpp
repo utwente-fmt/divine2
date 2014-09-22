@@ -141,7 +141,7 @@ std::string dve_compiler::cexpr( dve_expression_t & expr, std::string state )
 
 void dve_compiler::gen_header()
 {
-	line( "#include <stdlib.h>" );
+    line( "#include <stdlib.h>" );
     line( "#include <stdio.h>" );
     line( "#include <string.h>" );
     line( "#include <stdint.h>" );
@@ -473,7 +473,7 @@ void dve_compiler::analyse_expression( dve_expression_t & expr, ext_transition_t
             } else {
                 // some expression, mark all & continue analysis
                 mark_dependency(expr.get_ident_gid(), state_creator_t::VARIABLE, -1, dep);
-				if (dep == ext_transition.sv_write && may_write_add_read) {
+                if (dep == ext_transition.sv_write && may_write_add_read) {
                     mark_dependency(expr.get_ident_gid(), state_creator_t::VARIABLE, -1, ext_transition.sv_read);
                 }
                 if ((*expr.left()).get_operator() == T_ASSIGNMENT) {
@@ -1365,7 +1365,7 @@ void dve_compiler::gen_state_info()
     int k=0;
     for (size_int_t i=0; i<state_creators_count; ++i, ++k)
     {
-    	snprintf(buf, BUFLEN, "case %d:", k);
+        snprintf(buf, BUFLEN, "case %d:", k);
         line(buf);
 
         switch (state_creators[i].type)
@@ -2015,36 +2015,36 @@ void dve_compiler::gen_transition_info()
     guard_matrix.resize(guard.size());
     for(int i=0; i<guard.size(); i++) {
         std::vector<int> &per_guard_matrix = guard_matrix[i];
-    	 // clear per guard matrix
-		per_guard_matrix.resize(sv_count);
-		per_guard_matrix.clear();
-		switch(guard[i].type) {
-			case GUARD_PC:
-				mark_dependency(guard[i].pc.gid,
-								state_creator_t::PROCESS_STATE, -1, per_guard_matrix);
-				break;
-			case GUARD_EXPR: {
-				// use ext_transition dummy to store read/write vector
-				ext_transition_t et;
-				et.sv_read.resize(sv_count);
-				et.sv_write.resize(sv_count);
-				analyse_expression(*guard[i].expr.guard, et, et.sv_read);
-				per_guard_matrix = et.sv_read;
-				} break;
-			case GUARD_CHAN:
-				mark_dependency(guard[i].chan.chan,
-								state_creator_t::CHANNEL_BUFFER, -1, per_guard_matrix);
-				break;
-			case GUARD_COMMITED_FIRST:
-				for(size_int_t p = 0; p < get_process_count(); p++)
-					for(size_int_t c = 0; c < dynamic_cast<dve_process_t*>(get_process(p))->get_state_count(); c++)
-						if(dynamic_cast<dve_process_t*>(get_process(p))->get_commited(c))
-							mark_dependency(p, state_creator_t::PROCESS_STATE, -1, per_guard_matrix);
-				break;
-			default:
-				for(int j=0; j<sv_count; j++) per_guard_matrix[j]=1;
-				break;
-		}
+         // clear per guard matrix
+        per_guard_matrix.resize(sv_count);
+        per_guard_matrix.clear();
+        switch(guard[i].type) {
+            case GUARD_PC:
+                mark_dependency(guard[i].pc.gid,
+                                state_creator_t::PROCESS_STATE, -1, per_guard_matrix);
+                break;
+            case GUARD_EXPR: {
+                // use ext_transition dummy to store read/write vector
+                ext_transition_t et;
+                et.sv_read.resize(sv_count);
+                et.sv_write.resize(sv_count);
+                analyse_expression(*guard[i].expr.guard, et, et.sv_read);
+                per_guard_matrix = et.sv_read;
+                } break;
+            case GUARD_CHAN:
+                mark_dependency(guard[i].chan.chan,
+                                state_creator_t::CHANNEL_BUFFER, -1, per_guard_matrix);
+                break;
+            case GUARD_COMMITED_FIRST:
+                for(size_int_t p = 0; p < get_process_count(); p++)
+                    for(size_int_t c = 0; c < dynamic_cast<dve_process_t*>(get_process(p))->get_state_count(); c++)
+                        if(dynamic_cast<dve_process_t*>(get_process(p))->get_commited(c))
+                            mark_dependency(p, state_creator_t::PROCESS_STATE, -1, per_guard_matrix);
+                break;
+            default:
+                for(int j=0; j<sv_count; j++) per_guard_matrix[j]=1;
+                break;
+        }
     }
 
     // buchi transits on deadlocks, hence also depends on all other guards!
@@ -2056,7 +2056,7 @@ void dve_compiler::gen_transition_info()
             ext_transition_t& current2 = transitions[j];
             set<int>& gs2 = guards[j];
             if (!current2.buchi) {
-            	gs.insert(gs2.begin(), gs2.end());
+                gs.insert(gs2.begin(), gs2.end());
             }
         }
     }
@@ -2168,8 +2168,8 @@ void dve_compiler::gen_transition_info()
         append("{{" );
         for(size_int_t j = 0; j < sv_count; j++)
         {
-			snprintf(buf, BUFLEN, "%s%d", ((j==0)?"":","), transition_read_set[i][j]?1:0 );
-			append(buf);
+            snprintf(buf, BUFLEN, "%s%d", ((j==0)?"":","), transition_read_set[i][j]?1:0 );
+            append(buf);
         }
         append("},{" );
         for(size_int_t j = 0; j < sv_count; j++)
