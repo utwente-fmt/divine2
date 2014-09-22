@@ -993,86 +993,86 @@ void dve_compiler::gen_ltsmin_successors()
         for(size_int_t i = 0; i < this->get_process_count(); i++)
         {
             if( transition_map.find(i) != transition_map.end() && !is_property( i ) )
-                for(iter_process_transition_map = transition_map.find(i)->second.begin();
-                    iter_process_transition_map != transition_map.find(i)->second.end();
-                    iter_process_transition_map++)
+            for(iter_process_transition_map = transition_map.find(i)->second.begin();
+                iter_process_transition_map != transition_map.find(i)->second.end();
+                iter_process_transition_map++)
+            {
+                if(dynamic_cast<dve_process_t*>(get_process(i))->get_commited(
+                       iter_process_transition_map->first))
                 {
-                    if(dynamic_cast<dve_process_t*>(get_process(i))->get_commited(
-                           iter_process_transition_map->first))
+                    for(iter_ext_transition_vector = iter_process_transition_map->second.begin();
+                        iter_ext_transition_vector != iter_process_transition_map->second.end();
+                        iter_ext_transition_vector++)
                     {
-                        for(iter_ext_transition_vector = iter_process_transition_map->second.begin();
-                            iter_ext_transition_vector != iter_process_transition_map->second.end();
-                            iter_ext_transition_vector++)
+                        // !! jak je to s property synchronizaci v comitted stavech !!
+                        if( !iter_ext_transition_vector->synchronized ||
+                            dynamic_cast<dve_process_t*>(
+                                get_process(iter_ext_transition_vector->second->get_process_gid()))->
+                            get_commited(iter_ext_transition_vector->second->get_state1_lid()) )
                         {
-                            // !! jak je to s property synchronizaci v comitted stavech !!
-                            if( !iter_ext_transition_vector->synchronized ||
-                                dynamic_cast<dve_process_t*>(
-                                    get_process(iter_ext_transition_vector->second->get_process_gid()))->
-                                get_commited(iter_ext_transition_vector->second->get_state1_lid()) )
-                            {
-                                // only generate if not synchonized or synchonized with a committed transition
-                                new_label();
+                            // only generate if not synchonized or synchonized with a committed transition
+                            new_label();
 
-                                transition_guard( &*iter_ext_transition_vector, in );
-                                block_begin();
-                                new_output_state();
-                                transition_effect( &*iter_ext_transition_vector, in, out );
-                                yield_state();
-                                block_end();
+                            transition_guard( &*iter_ext_transition_vector, in );
+                            block_begin();
+                            new_output_state();
+                            transition_effect( &*iter_ext_transition_vector, in, out );
+                            yield_state();
+                            block_end();
 
-                                line("return states_emitted;");
-                            }
+                            line("return states_emitted;");
                         }
                     }
                 }
+            }
         }
     }
 
     for(size_int_t i = 0; i < get_process_count(); i++)
     {
         if(transition_map.find(i) != transition_map.end() && !is_property( i ))
-            for(iter_process_transition_map = transition_map.find(i)->second.begin();
-                iter_process_transition_map != transition_map.find(i)->second.end();
-                iter_process_transition_map++)
+        for(iter_process_transition_map = transition_map.find(i)->second.begin();
+            iter_process_transition_map != transition_map.find(i)->second.end();
+            iter_process_transition_map++)
+        {
+            for(iter_ext_transition_vector = iter_process_transition_map->second.begin();
+                iter_ext_transition_vector != iter_process_transition_map->second.end();
+                iter_ext_transition_vector++)
             {
-                for(iter_ext_transition_vector = iter_process_transition_map->second.begin();
-                    iter_ext_transition_vector != iter_process_transition_map->second.end();
-                    iter_ext_transition_vector++)
+                // make sure this transition is not a committed one
+                if (!
+                    dynamic_cast<dve_process_t*>(
+                        get_process(iter_ext_transition_vector->first->get_process_gid()))->
+                    get_commited(iter_ext_transition_vector->first->get_state1_lid()) )
                 {
-                    // make sure this transition is not a committed one
-                    if (!
-                        dynamic_cast<dve_process_t*>(
-                            get_process(iter_ext_transition_vector->first->get_process_gid()))->
-                        get_commited(iter_ext_transition_vector->first->get_state1_lid()) )
+
+                    new_label();
+
+                    transition_guard( &*iter_ext_transition_vector, in );
+                    block_begin();
+                    if (some_commited_state)
                     {
+                        // committed state
+                        if_begin( true );
 
-                        new_label();
+                        for(size_int_t p = 0; p < get_process_count(); p++)
+                            for(size_int_t c = 0; c < dynamic_cast<dve_process_t*>(get_process(p))->get_state_count(); c++)
+                                if(dynamic_cast<dve_process_t*>(get_process(p))->get_commited(c))
+                                    if_clause( in_state( p, c, in ) );
 
-                        transition_guard( &*iter_ext_transition_vector, in );
-                        block_begin();
-                        if (some_commited_state)
-                        {
-                            // committed state
-                            if_begin( true );
-
-                            for(size_int_t p = 0; p < get_process_count(); p++)
-                                for(size_int_t c = 0; c < dynamic_cast<dve_process_t*>(get_process(p))->get_state_count(); c++)
-                                    if(dynamic_cast<dve_process_t*>(get_process(p))->get_commited(c))
-                                        if_clause( in_state( p, c, in ) );
-
-                            if_end();
-                            line("    return 0;"); // bail out early
-                        }
-
-
-                        new_output_state();
-                        transition_effect( &*iter_ext_transition_vector, in, out );
-                        yield_state();
-                        block_end();
-                        line("return states_emitted;");
+                        if_end();
+                        line("    return 0;"); // bail out early
                     }
+
+
+                    new_output_state();
+                    transition_effect( &*iter_ext_transition_vector, in, out );
+                    yield_state();
+                    block_end();
+                    line("return states_emitted;");
                 }
             }
+        }
     }
 }
 
