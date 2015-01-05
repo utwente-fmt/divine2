@@ -20,24 +20,34 @@ const char *compile_defines_str = "\
 #define BLOB_NO_HASH\n";
 }
 
+static const char * get_op(int op) {
+
+	switch(op) {
+		case T_LT: return "<";
+		case T_LEQ: return "<=";
+		case T_EQ: return "==";
+		case T_NEQ: return "!=";
+		case T_GT: return ">";
+		case T_GEQ: return ">=";
+		case T_PLUS: return "+";
+		case T_MINUS: return "-";
+		case T_MULT: return "*";
+		case T_DIV: return "/";
+		case T_MOD: return "%";
+		case T_AND: return "&";
+		case T_OR: return "|";
+		case T_XOR: return "^";
+		case T_LSHIFT: return "<<";
+		case T_RSHIFT: return ">>";
+		case T_BOOL_AND: return "&&";
+		case T_BOOL_OR: return "||";
+		case T_ASSIGNMENT: return "=";
+	}
+	return "";
+}
+
 void dve_compiler::write_C(dve_expression_t & expr, std::ostream & ostr, std::string state_name)
 {
-    std::map< int, const char * > op;
-
-    op[ T_LT ] = "<"; op[ T_LEQ ] = "<=";
-    op[ T_EQ ] = "=="; op[ T_NEQ ] = "!=";
-    op[ T_GT ] = ">"; op[ T_GEQ ] = ">=";
-
-    op[ T_PLUS ] = "+"; op[ T_MINUS ] = "-";
-    op[ T_MULT ] = "*"; op[ T_DIV ] = "/"; op[ T_MOD ] = "%";
-
-    op[ T_AND ] = "&"; op[ T_OR ] = "|"; op[ T_XOR ] = "^";
-    op[ T_LSHIFT ] = "<<"; op[ T_RSHIFT ] = ">>";
-
-    op[ T_BOOL_AND ] = "&&"; op[ T_BOOL_OR ] = "||";
-
-    op[ T_ASSIGNMENT ] = "=";
-
     dve_symbol_table_t * parent_table = expr.get_symbol_table();
     if (!parent_table) gerr << "Writing expression: Symbol table not set" << thr();
     switch (expr.get_operator())
@@ -96,7 +106,7 @@ void dve_compiler::write_C(dve_expression_t & expr, std::ostream & ostr, std::st
         case T_AND: case T_OR: case T_XOR: case T_LSHIFT: case T_RSHIFT:
         case T_BOOL_AND: case T_BOOL_OR: case T_ASSIGNMENT:
             write_C( *expr.left(), ostr, state_name );
-            ostr << " " << op[ expr.get_operator() ] << " ";
+            ostr << " " << get_op(expr.get_operator()) << " ";
             write_C( *expr.right(), ostr, state_name );
             break;
 
