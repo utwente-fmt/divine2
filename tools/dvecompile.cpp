@@ -2214,7 +2214,7 @@ void dve_compiler::gen_transition_info()
     /////////////////////////////////
 
     // transition -> set of guards
-    std::map<int, std::set<int> > guards;
+    std::map<int, std::vector<int> > guards;
     // set of guards
     std::vector<guard> guard;
 
@@ -2229,12 +2229,12 @@ void dve_compiler::gen_transition_info()
         ext_transition_t& current = transitions[i];
 
         // reference to the set of guards for transition i
-        set<int>& gs = guards[i];
+        vector<int>& gs = guards[i];
         int g;
 
         // push the local state as guard
         g = add_guard_pc(guard, current.first->get_process_gid(), current.first->get_state1_lid());
-        gs.insert(g);
+        gs.push_back(g);
 
         // push first guard as a whole
         if (current.first->get_guard()) {
@@ -2246,18 +2246,18 @@ void dve_compiler::gen_transition_info()
                 // add all split guards
                 for(int j=0; j<gtmp.size(); j++) {
                     g = add_guard_expr(guard, gtmp[j].expr.guard);
-                    gs.insert(g);
+                    gs.push_back(g);
                 }
             } else {
                 g = add_guard_expr(guard, current.first->get_guard());
-                gs.insert(g);
+                gs.push_back(g);
             }
         }
 
         // check synchronized
         if ( current.synchronized ) {
             g = add_guard_pc(guard, current.second->get_process_gid(), current.second->get_state1_lid());
-            gs.insert(g);
+            gs.push_back(g);
             if (current.second->get_guard()) {
                 // try splitting the second guard
                 std::vector<struct guard> gtmp;
@@ -2267,11 +2267,11 @@ void dve_compiler::gen_transition_info()
                     // add all split guards
                     for(int j=0; j<gtmp.size(); j++) {
                         g = add_guard_expr(guard, gtmp[j].expr.guard);
-                        gs.insert(g);
+                        gs.push_back(g);
                     }
                 } else {
                     g = add_guard_expr(guard, current.second->get_guard());
-                    gs.insert(g);
+                    gs.push_back(g);
                 }
             }
         } else {
@@ -2280,14 +2280,14 @@ void dve_compiler::gen_transition_info()
             if (current.first->get_sync_mode() == SYNC_EXCLAIM_BUFFER ||
                 current.first->get_sync_mode() == SYNC_ASK_BUFFER) {
                 g = add_guard_chan(guard, chan, current.first->get_sync_mode());
-                gs.insert(g);
+                gs.push_back(g);
             }
         }
 
         // committed?
         if (has_commited) {
             if (!current.commited) {
-                gs.insert(0);
+                gs.push_back(0);
             }
         }
     }
@@ -2335,13 +2335,13 @@ void dve_compiler::gen_transition_info()
     // buchi transits on deadlocks, hence also depends on all other guards!
     for(size_int_t i = 0; i < transitions.size(); i++) {
         ext_transition_t& current = transitions[i];
-        set<int>& gs = guards[i];
+        vector<int>& gs = guards[i];
         if (current.buchi)
         for(size_int_t j = 0; j < transitions.size(); j++) {
             ext_transition_t& current2 = transitions[j];
-            set<int>& gs2 = guards[j];
+            vector<int>& gs2 = guards[j];
             if (!current2.buchi) {
-                gs.insert(gs2.begin(), gs2.end());
+                gs.insert(gs.begin(), gs2.begin(), gs2.end());
             }
         }
     }
@@ -2350,17 +2350,17 @@ void dve_compiler::gen_transition_info()
    std::vector< std::vector<bool> > transition_coenabled(transitions.size());
 
     for(size_int_t i=0; i < transitions.size(); i++) {
-        set<int> &gs = guards[i];
+        vector<int> &gs = guards[i];
         std::vector<bool> tmp(transitions.size());
         transition_coenabled[i] = tmp;
 
         // for each guard of transition i
-        for(set<int>::iterator ix = gs.begin(); ix != gs.end(); ix++) {
+        for(vector<int>::iterator ix = gs.begin(); ix != gs.end(); ix++) {
             // check coenabledness with each guard of transition j
             for(size_int_t j=0; j < transitions.size(); j++) {
                 bool coenabled = true;
-                set<int> &gs2 = guards[j];
-                for(set<int>::iterator iy = gs2.begin(); iy != gs2.end(); iy++) {
+                vector<int> &gs2 = guards[j];
+                for(vector<int>::iterator iy = gs2.begin(); iy != gs2.end(); iy++) {
                      coenabled &= may_be_coenabled(guard[*ix], guard[*iy]);
                 }
                 transition_coenabled[i][j] = coenabled;
@@ -2393,11 +2393,11 @@ void dve_compiler::gen_transition_info()
     // compute nds of transitions x transition
     std::vector< std::vector<bool> > transition_nds(transitions.size());
     for(size_int_t i=0; i < transitions.size(); i++) {
-        set<int> &gs = guards[i];
+        vector<int> &gs = guards[i];
         std::vector<bool> tmp(transitions.size());
         transition_nds[i] = tmp;
         // for each guard of transition i, mark the disabling transitions as disabling..
-        for(set<int>::iterator ix = gs.begin(); ix != gs.end(); ix++) {
+        for(vector<int>::iterator ix = gs.begin(); ix != gs.end(); ix++) {
             for(size_int_t j=0; j < transitions.size(); j++) {
                 transition_nds[i][j] = guard_nds[*ix][j];
             }
@@ -2430,8 +2430,8 @@ void dve_compiler::gen_transition_info()
         {
             int dep = current.commited?current.sv_read[j]:max(c_base_sv_read[j], current.sv_read[j]);
             if (!dep && current.buchi) { // use guard info
-                set<int> &gs = guards[i];
-                for(set<int>::iterator ix = gs.begin(); ix != gs.end(); ix++) {
+                vector<int> &gs = guards[i];
+                for(vector<int>::iterator ix = gs.begin(); ix != gs.end(); ix++) {
                     std::vector<int> &per_guard_matrix = guard_matrix[*ix];
                     if (per_guard_matrix[j]) {
                         dep = 1;
@@ -2714,13 +2714,13 @@ void dve_compiler::gen_transition_info()
     line(buf);
     block_begin();
         for(int i=0; i < transitions.size(); i++) {
-            set<int>& gs = guards[i];
+            vector<int>& gs = guards[i];
 
             snprintf(buf, BUFLEN, "((int[]){");
             append(buf);
             snprintf(buf, BUFLEN, "%zu", gs.size());
             append(buf);
-            for(set<int>::iterator ix = gs.begin(); ix != gs.end(); ix++) {
+            for(vector<int>::iterator ix = gs.begin(); ix != gs.end(); ix++) {
                 snprintf(buf, BUFLEN, ", %d", *ix);
                 append(buf);
             }
