@@ -115,6 +115,10 @@ struct dve_compiler: public dve_explicit_system_t
                              vector<ext_transition_t> &ext_transition_vector );
     void analyse();
 
+    void write_div_check_C(dve_expression_t & expr, std::ostream & ostr, std::string state_name);
+    void write_bound_check_C(dve_expression_t & expr, std::ostream & ostr, std::string state_name);
+    void write_maybe_check_C(dve_expression_t & expr, std::ostream & ostr, std::string state_name);
+
     void write_C(dve_expression_t & expr, std::ostream & ostr, std::string state_name);
 
     bool m_if_disjoint;
@@ -195,6 +199,7 @@ struct dve_compiler: public dve_explicit_system_t
         return get_with_property() && i == get_property_gid();
     }
 
+    std::string cmaybe( dve_expression_t &expr, std::string state );
     std::string cexpr( dve_expression_t &expr, std::string state );
     void print_cexpr( dve_expression_t &expr, std::string state )
     {

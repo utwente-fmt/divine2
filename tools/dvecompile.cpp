@@ -46,6 +46,140 @@ static const char * get_op(int op) {
 	return "";
 }
 
+void dve_compiler::write_div_check_C(dve_expression_t & expr, std::ostream & ostr, std::string state_name)
+{
+	switch (expr.get_operator())
+	{
+		case T_ID:
+        case T_FOREIGN_ID:
+        	// do div check
+			ostr << " " << get_op(T_BOOL_OR) << " ";
+            write_C(expr, ostr, state_name);
+			ostr << " " << get_op(T_EQ) << " " << 0;
+			break;
+		case T_NAT:
+		case T_DOT:
+			break;
+		case T_PARENTHESIS:
+			write_maybe_check_C(*expr.left(), ostr, state_name);
+			break;
+		case T_SQUARE_BRACKETS:
+        case T_FOREIGN_SQUARE_BRACKETS:
+        	// first continue with index
+			write_bound_check_C(*expr.left(), ostr, state_name);
+
+			// do div check
+			ostr << " " << get_op(T_BOOL_OR) << " ";
+            write_C(expr, ostr, state_name);
+			ostr << " " << get_op(T_EQ) << " " << 0;
+			break;
+		case T_LT: case T_LEQ: case T_EQ: case T_NEQ: case T_GT: case T_GEQ:
+		case T_PLUS: case T_MINUS: case T_MULT:
+		case T_AND: case T_OR: case T_XOR: case T_LSHIFT: case T_RSHIFT:
+		case T_BOOL_AND: case T_BOOL_OR: case T_ASSIGNMENT: case T_IMPLY:
+			write_maybe_check_C(*expr.left(), ostr, state_name);
+		case T_UNARY_MINUS:
+		case T_TILDE:
+		case T_BOOL_NOT:
+			write_maybe_check_C(*expr.right(), ostr, state_name);
+			break;
+		case T_DIV: case T_MOD:
+			write_maybe_check_C(*expr.left(), ostr, state_name);
+			write_div_check_C(*expr.right(), ostr, state_name);
+			break;
+		default:
+			gerr << "Problem in expression - unknown operator"
+				 << " number " << expr.get_operator() << psh();
+	}
+}
+
+void dve_compiler::write_bound_check_C(dve_expression_t & expr, std::ostream & ostr, std::string state_name)
+{
+
+	dve_symbol_table_t * parent_table = expr.get_symbol_table();
+	if (!parent_table) gerr << "Writing expression: Symbol table not set" << thr();
+
+	switch (expr.get_operator())
+	{
+		case T_ID:
+		case T_FOREIGN_ID:
+		case T_NAT:
+		case T_DOT:
+			break;
+		case T_PARENTHESIS:
+			write_maybe_check_C(*expr.left(), ostr, state_name);
+			break;
+		case T_SQUARE_BRACKETS:
+		case T_FOREIGN_SQUARE_BRACKETS:
+			// continue with array index
+			write_maybe_check_C(*expr.left(), ostr, state_name);
+
+			// read beyond size of array
+			ostr << " " << get_op(T_BOOL_OR) << " ";
+			write_C(*expr.left(), ostr, state_name);
+			ostr << " " << get_op(T_GEQ) << " " << parent_table->get_variable(expr.get_ident_gid())->get_vector_size();
+
+			// read smaller than zero
+			ostr << " " << get_op(T_BOOL_OR) << " ";
+			write_C(*expr.left(), ostr, state_name);
+			ostr << " " << get_op(T_LT) << " 0";
+			break;
+		case T_LT: case T_LEQ: case T_EQ: case T_NEQ: case T_GT: case T_GEQ:
+		case T_PLUS: case T_MINUS: case T_MULT:
+		case T_AND: case T_OR: case T_XOR: case T_LSHIFT: case T_RSHIFT:
+		case T_BOOL_AND: case T_BOOL_OR: case T_ASSIGNMENT: case T_IMPLY:
+			write_maybe_check_C(*expr.left(), ostr, state_name);
+		case T_UNARY_MINUS:
+		case T_TILDE:
+		case T_BOOL_NOT:
+			write_maybe_check_C(*expr.right(), ostr, state_name);
+			break;
+		case T_DIV: case T_MOD:
+			write_maybe_check_C(*expr.left(), ostr, state_name);
+			write_div_check_C(*expr.right(), ostr, state_name);
+			break;
+		default:
+			gerr << "Problem in expression - unknown operator"
+				 << " number " << expr.get_operator() << psh();
+	}
+}
+
+void dve_compiler::write_maybe_check_C(dve_expression_t & expr, std::ostream & ostr, std::string state_name)
+{
+	switch (expr.get_operator())
+	{
+		case T_ID:
+		case T_FOREIGN_ID:
+		case T_NAT:
+		case T_DOT:
+			break;
+		case T_PARENTHESIS:
+			write_maybe_check_C(*expr.left(), ostr, state_name);
+			break;
+		case T_SQUARE_BRACKETS:
+		case T_FOREIGN_SQUARE_BRACKETS:
+			write_bound_check_C(expr, ostr, state_name);
+			break;
+		case T_LT: case T_LEQ: case T_EQ: case T_NEQ: case T_GT: case T_GEQ:
+		case T_PLUS: case T_MINUS: case T_MULT:
+		case T_AND: case T_OR: case T_XOR: case T_LSHIFT: case T_RSHIFT:
+		case T_BOOL_AND: case T_BOOL_OR: case T_ASSIGNMENT: case T_IMPLY:
+			write_maybe_check_C(*expr.left(), ostr, state_name);
+		case T_UNARY_MINUS:
+		case T_TILDE:
+		case T_BOOL_NOT:
+			write_maybe_check_C(*expr.right(), ostr, state_name);
+			break;
+		case T_DIV: case T_MOD:
+			write_maybe_check_C(*expr.left(), ostr, state_name);
+			write_div_check_C(*expr.right(), ostr, state_name);
+			break;
+		default:
+			gerr << "Problem in expression - unknown operator"
+				 << " number " << expr.get_operator() << psh();
+	}
+}
+
 void dve_compiler::write_C(dve_expression_t & expr, std::ostream & ostr, std::string state_name)
 {
     dve_symbol_table_t * parent_table = expr.get_symbol_table();
@@ -138,6 +272,13 @@ void dve_compiler::write_C(dve_expression_t & expr, std::ostream & ostr, std::st
             gerr << "Problem in expression - unknown operator"
                  << " number " << expr.get_operator() << psh();
     }
+}
+
+std::string dve_compiler::cmaybe( dve_expression_t & expr, std::string state )
+{
+    std::stringstream str;
+    write_maybe_check_C( expr, str, state.c_str() );
+    return str.str();
 }
 
 std::string dve_compiler::cexpr( dve_expression_t & expr, std::string state )
@@ -2482,7 +2623,9 @@ void dve_compiler::gen_transition_info()
                     line(buf);
                     break;
                 case GUARD_EXPR:
-                    snprintf(buf, BUFLEN, "case %d: return (%s);", i, cexpr(*guard[i].expr.guard,"(*src)").c_str());
+                	snprintf(buf, BUFLEN, "case %d: return (0%s) ? 2 : ", i, cmaybe(*guard[i].expr.guard, "(*src)").c_str());
+                	line(buf);
+                    snprintf(buf, BUFLEN, "        (%s);", cexpr(*guard[i].expr.guard,"(*src)").c_str());
                     line(buf);
                     break;
                 case GUARD_CHAN:
@@ -2526,7 +2669,9 @@ void dve_compiler::gen_transition_info()
                 line(buf);
                 break;
             case GUARD_EXPR:
-                snprintf(buf, BUFLEN, "guard[%d] = (%s);", i, cexpr(*guard[i].expr.guard,"(*src)").c_str());
+            	snprintf(buf, BUFLEN, "guard[%d] = (0%s) ? 2 : ", i, cmaybe(*guard[i].expr.guard, "(*src)").c_str());
+            	line(buf);
+                snprintf(buf, BUFLEN, "        (%s);", cexpr(*guard[i].expr.guard,"(*src)").c_str());
                 line(buf);
                 break;
             case GUARD_CHAN:
@@ -2579,7 +2724,8 @@ void dve_compiler::gen_transition_info()
                 snprintf(buf, BUFLEN, ", %d", *ix);
                 append(buf);
             }
-            line("}),");
+            snprintf(buf, BUFLEN, "}), // %d", i );
+            line(buf);
         }
     block_end();
     line(";");
