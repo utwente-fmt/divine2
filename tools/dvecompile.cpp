@@ -2117,60 +2117,6 @@ bool dve_compiler::split_conjunctive_expression(std::vector<guard>& guard, dve_e
     }
 }
 
-void dve_compiler::merge_dependent_expression(std::vector<guard>& guard, int sv_count)
-{
-    std::vector<struct guard> result;
-    // mark state vector dependent indices for each guard
-    std::vector< std::vector<int> > guard_matrix(guard.size());
-    for(int i=0; i < guard.size(); i++) {
-        ext_transition_t et;
-        et.sv_read.resize(sv_count);
-        et.sv_may_write.resize(sv_count);
-        et.sv_must_write.resize(sv_count);
-        et.sv_actions_read.resize(sv_count);
-        analyse_expression(*guard[i].expr.guard, et, et.sv_read);
-        guard_matrix[i] = et.sv_read;
-    }
-
-    // merge guards in reverse order
-    // this preserves the original order of the guards, thus (i < 5) && a[i] will
-    // be merged in the correct order
-    for(int i=guard.size()-1; i >=0; i--) {
-        // check all guards before this one
-        int dep = -1;
-        for(int j=i-1; j>=0 && dep == -1; j--) {
-            dep = -1;
-            for(int k=0; k < sv_count; k++) {
-                if (guard_matrix[i][k] == 1 && guard_matrix[j][k] == 1) {
-                    dep = j;
-                    break;
-                }
-            }
-        }
-        // none of the guards are dependent, push out
-        if (dep == -1) {
-            guard_matrix.pop_back();
-            result.push_back(guard[i]);
-        // else merge the to
-        } else {
-            // merge guard
-            for(int k=0; k < sv_count; k++) {
-                guard_matrix[dep][k] = max(guard_matrix[dep][k], guard_matrix[i][k]);
-            }
-            guard_matrix.pop_back();
-            // merge expression
-            struct guard g = guard[dep];
-            g.expr.guard =
-                new dve_expression_t(T_BOOL_AND, *guard[dep].expr.guard, *guard[i].expr.guard,
-                                    dynamic_cast<dve_system_t*>(guard[dep].expr.guard->get_parent_system()) );
-
-            guard[dep] = g;
-            guard.pop_back();
-        }
-    }
-    guard.swap(result);
-}
-
 class mystreambuf: public std::streambuf {};
 
 static void report (ostream &log, string name, size_int_t count, size_int_t total) {
@@ -2241,8 +2187,6 @@ void dve_compiler::gen_transition_info()
             // try splitting the first guard
             std::vector<struct guard> gtmp;
             if (split_conjunctive_expression(gtmp, current.first->get_guard())) {
-                // merge dependent guards again
-                merge_dependent_expression(gtmp, sv_count);
                 // add all split guards
                 for(int j=0; j<gtmp.size(); j++) {
                     g = add_guard_expr(guard, gtmp[j].expr.guard);
@@ -2262,8 +2206,6 @@ void dve_compiler::gen_transition_info()
                 // try splitting the second guard
                 std::vector<struct guard> gtmp;
                 if (split_conjunctive_expression(gtmp, current.second->get_guard())) {
-                    // merge dependent guards again
-                    merge_dependent_expression(gtmp, sv_count);
                     // add all split guards
                     for(int j=0; j<gtmp.size(); j++) {
                         g = add_guard_expr(guard, gtmp[j].expr.guard);
