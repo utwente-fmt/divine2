@@ -46,141 +46,7 @@ static const char * get_op(int op) {
 	return "";
 }
 
-void dve_compiler::write_div_check_C(dve_expression_t & expr, std::ostream & ostr, std::string state_name)
-{
-	switch (expr.get_operator())
-	{
-		case T_ID:
-        case T_FOREIGN_ID:
-        	// do div check
-			ostr << " " << get_op(T_BOOL_OR) << " ";
-            write_C(expr, ostr, state_name);
-			ostr << " " << get_op(T_EQ) << " " << 0;
-			break;
-		case T_NAT:
-		case T_DOT:
-			break;
-		case T_PARENTHESIS:
-			write_maybe_check_C(*expr.left(), ostr, state_name);
-			break;
-		case T_SQUARE_BRACKETS:
-        case T_FOREIGN_SQUARE_BRACKETS:
-        	// first continue with index
-			write_bound_check_C(*expr.left(), ostr, state_name);
-
-			// do div check
-			ostr << " " << get_op(T_BOOL_OR) << " ";
-            write_C(expr, ostr, state_name);
-			ostr << " " << get_op(T_EQ) << " " << 0;
-			break;
-		case T_LT: case T_LEQ: case T_EQ: case T_NEQ: case T_GT: case T_GEQ:
-		case T_PLUS: case T_MINUS: case T_MULT:
-		case T_AND: case T_OR: case T_XOR: case T_LSHIFT: case T_RSHIFT:
-		case T_BOOL_AND: case T_BOOL_OR: case T_ASSIGNMENT: case T_IMPLY:
-			write_maybe_check_C(*expr.left(), ostr, state_name);
-		case T_UNARY_MINUS:
-		case T_TILDE:
-		case T_BOOL_NOT:
-			write_maybe_check_C(*expr.right(), ostr, state_name);
-			break;
-		case T_DIV: case T_MOD:
-			write_maybe_check_C(*expr.left(), ostr, state_name);
-			write_div_check_C(*expr.right(), ostr, state_name);
-			break;
-		default:
-			gerr << "Problem in expression - unknown operator"
-				 << " number " << expr.get_operator() << psh();
-	}
-}
-
-void dve_compiler::write_bound_check_C(dve_expression_t & expr, std::ostream & ostr, std::string state_name)
-{
-
-	dve_symbol_table_t * parent_table = expr.get_symbol_table();
-	if (!parent_table) gerr << "Writing expression: Symbol table not set" << thr();
-
-	switch (expr.get_operator())
-	{
-		case T_ID:
-		case T_FOREIGN_ID:
-		case T_NAT:
-		case T_DOT:
-			break;
-		case T_PARENTHESIS:
-			write_maybe_check_C(*expr.left(), ostr, state_name);
-			break;
-		case T_SQUARE_BRACKETS:
-		case T_FOREIGN_SQUARE_BRACKETS:
-			// continue with array index
-			write_maybe_check_C(*expr.left(), ostr, state_name);
-
-			// read beyond size of array
-			ostr << " " << get_op(T_BOOL_OR) << " ";
-			write_C(*expr.left(), ostr, state_name);
-			ostr << " " << get_op(T_GEQ) << " " << parent_table->get_variable(expr.get_ident_gid())->get_vector_size();
-
-			// read smaller than zero
-			ostr << " " << get_op(T_BOOL_OR) << " ";
-			write_C(*expr.left(), ostr, state_name);
-			ostr << " " << get_op(T_LT) << " 0";
-			break;
-		case T_LT: case T_LEQ: case T_EQ: case T_NEQ: case T_GT: case T_GEQ:
-		case T_PLUS: case T_MINUS: case T_MULT:
-		case T_AND: case T_OR: case T_XOR: case T_LSHIFT: case T_RSHIFT:
-		case T_BOOL_AND: case T_BOOL_OR: case T_ASSIGNMENT: case T_IMPLY:
-			write_maybe_check_C(*expr.left(), ostr, state_name);
-		case T_UNARY_MINUS:
-		case T_TILDE:
-		case T_BOOL_NOT:
-			write_maybe_check_C(*expr.right(), ostr, state_name);
-			break;
-		case T_DIV: case T_MOD:
-			write_maybe_check_C(*expr.left(), ostr, state_name);
-			write_div_check_C(*expr.right(), ostr, state_name);
-			break;
-		default:
-			gerr << "Problem in expression - unknown operator"
-				 << " number " << expr.get_operator() << psh();
-	}
-}
-
-void dve_compiler::write_maybe_check_C(dve_expression_t & expr, std::ostream & ostr, std::string state_name)
-{
-	switch (expr.get_operator())
-	{
-		case T_ID:
-		case T_FOREIGN_ID:
-		case T_NAT:
-		case T_DOT:
-			break;
-		case T_PARENTHESIS:
-			write_maybe_check_C(*expr.left(), ostr, state_name);
-			break;
-		case T_SQUARE_BRACKETS:
-		case T_FOREIGN_SQUARE_BRACKETS:
-			write_bound_check_C(expr, ostr, state_name);
-			break;
-		case T_LT: case T_LEQ: case T_EQ: case T_NEQ: case T_GT: case T_GEQ:
-		case T_PLUS: case T_MINUS: case T_MULT:
-		case T_AND: case T_OR: case T_XOR: case T_LSHIFT: case T_RSHIFT:
-		case T_BOOL_AND: case T_BOOL_OR: case T_ASSIGNMENT: case T_IMPLY:
-			write_maybe_check_C(*expr.left(), ostr, state_name);
-		case T_UNARY_MINUS:
-		case T_TILDE:
-		case T_BOOL_NOT:
-			write_maybe_check_C(*expr.right(), ostr, state_name);
-			break;
-		case T_DIV: case T_MOD:
-			write_maybe_check_C(*expr.left(), ostr, state_name);
-			write_div_check_C(*expr.right(), ostr, state_name);
-			break;
-		default:
-			gerr << "Problem in expression - unknown operator"
-				 << " number " << expr.get_operator() << psh();
-	}
-}
-
-void dve_compiler::write_C(dve_expression_t & expr, std::ostream & ostr, std::string state_name)
+void dve_compiler::write_C(dve_expression_t & expr, std::ostream & ostr, std::string state_name, bool wrap)
 {
     dve_symbol_table_t * parent_table = expr.get_symbol_table();
     if (!parent_table) gerr << "Writing expression: Symbol table not set" << thr();
@@ -210,7 +76,7 @@ void dve_compiler::write_C(dve_expression_t & expr, std::ostream & ostr, std::st
             break;
         case T_PARENTHESIS:
             ostr << "(";
-            write_C(*expr.left(), ostr, state_name);
+            write_C(*expr.left(), ostr, state_name, wrap);
             ostr << ")";
             break;
         case T_SQUARE_BRACKETS:
@@ -222,8 +88,12 @@ void dve_compiler::write_C(dve_expression_t & expr, std::ostream & ostr, std::st
                                                   get_process_gid())->get_name(); //name of process
                 ostr<<".";
             }
-            ostr << parent_table->get_variable(expr.get_ident_gid())->
-                get_name(); ostr<<"["; write_C(*expr.left(), ostr, state_name); ostr<<"]" ;
+            ostr << parent_table->get_variable(expr.get_ident_gid())->get_name();
+            ostr<<"[";
+            if (wrap) ostr << "wrapped_index(";
+            write_C(*expr.left(), ostr, state_name, wrap);
+            if (wrap) ostr << ", " << parent_table->get_variable(expr.get_ident_gid())->get_vector_size() << ", &jbuf)";
+            ostr<<"]" ;
             if (ltsmin) ostr << ".var";
             break;
         case T_FOREIGN_SQUARE_BRACKETS:
@@ -231,17 +101,29 @@ void dve_compiler::write_C(dve_expression_t & expr, std::ostream & ostr, std::st
                                               get_process_gid())->get_name(); //name of preocess
             ostr<<"->";
             ostr << parent_table->get_variable(expr.get_ident_gid())->get_name();
-            ostr<<"["; write_C(*expr.left(), ostr, state_name); ostr<<"]";
+            ostr<<"[";
+            if (wrap) ostr << "wrapped_index(";
+            write_C(*expr.left(), ostr, state_name, wrap);
+            if (wrap) ostr << ", " << parent_table->get_variable(expr.get_ident_gid())->get_vector_size() << ", &jbuf)";
+            ostr<<"]";
             if (ltsmin) ostr << ".var";
             break;
 
         case T_LT: case T_LEQ: case T_EQ: case T_NEQ: case T_GT: case T_GEQ:
-        case T_PLUS: case T_MINUS: case T_MULT: case T_DIV: case T_MOD:
+        case T_PLUS: case T_MINUS: case T_MULT:
         case T_AND: case T_OR: case T_XOR: case T_LSHIFT: case T_RSHIFT:
         case T_BOOL_AND: case T_BOOL_OR: case T_ASSIGNMENT:
-            write_C( *expr.left(), ostr, state_name );
+            write_C( *expr.left(), ostr, state_name, wrap );
             ostr << " " << get_op(expr.get_operator()) << " ";
-            write_C( *expr.right(), ostr, state_name );
+            write_C( *expr.right(), ostr, state_name, wrap );
+            break;
+        case T_MOD:
+        case T_DIV:
+            write_C( *expr.left(), ostr, state_name, wrap );
+            ostr << " " << get_op(expr.get_operator()) << " ";
+            if (wrap) ostr << "wrapped_div(";
+            write_C( *expr.right(), ostr, state_name, wrap );
+            if (wrap) ostr << ", &jbuf)";
             break;
 
         case T_DOT:
@@ -251,21 +133,21 @@ void dve_compiler::write_C(dve_expression_t & expr, std::ostream & ostr, std::st
             break;
 
         case T_IMPLY:
-            write_C(*expr.left(), ostr, state_name);
+            write_C(*expr.left(), ostr, state_name, wrap);
             ostr<<" -> "; // FIXME this looks wrong, -> in C is dereference
-            write_C(*expr.right(), ostr, state_name);
+            write_C(*expr.right(), ostr, state_name, wrap);
             break;
         case T_UNARY_MINUS:
             ostr<<"-";
-            write_C(*expr.right(), ostr, state_name);
+            write_C(*expr.right(), ostr, state_name, wrap);
             break;
         case T_TILDE:
             ostr<<"~";
-            write_C(*expr.right(), ostr, state_name);
+            write_C(*expr.right(), ostr, state_name, wrap);
             break;
         case T_BOOL_NOT:
             ostr<<" ! (";
-            write_C(*expr.right(), ostr, state_name);
+            write_C(*expr.right(), ostr, state_name, wrap);
             ostr<< " )";
             break;
         default:
@@ -274,18 +156,11 @@ void dve_compiler::write_C(dve_expression_t & expr, std::ostream & ostr, std::st
     }
 }
 
-std::string dve_compiler::cmaybe( dve_expression_t & expr, std::string state )
-{
-    std::stringstream str;
-    write_maybe_check_C( expr, str, state.c_str() );
-    return str.str();
-}
-
-std::string dve_compiler::cexpr( dve_expression_t & expr, std::string state )
+std::string dve_compiler::cexpr( dve_expression_t & expr, std::string state, bool wrap )
 {
     std::stringstream str;
     str << "(";
-    write_C( expr, str, state.c_str() );
+    write_C( expr, str, state.c_str(), wrap );
     str << ")";
     return str.str();
 }
@@ -296,6 +171,7 @@ void dve_compiler::gen_header()
     line( "#include <stdio.h>" );
     line( "#include <string.h>" );
     line( "#include <stdint.h>" );
+    line( "#include <setjmp.h>" );
     line();
 
     if (ltsmin) {
@@ -385,7 +261,7 @@ void dve_compiler::gen_state_struct()
                 for (size_int_t j=0; j!=var->get_init_expr_count(); j++)
                 {
                     if (ltsmin) append("{");
-                    append( cexpr( *((dve_expression_t*)var->get_init_expr(j)), "") );
+                    append( cexpr( *((dve_expression_t*)var->get_init_expr(j)), "", false) );
                     if (ltsmin) append("}");
                     if (j!=(var->get_init_expr_count()-1))
                         append( ", " );
@@ -395,7 +271,7 @@ void dve_compiler::gen_state_struct()
             } else if ( var->get_init_expr() ) {
                 append( string( " = " ) );
                 if (ltsmin) append(" {");
-                append( cexpr( *((dve_expression_t*) var->get_init_expr()), "") );
+                append( cexpr( *((dve_expression_t*) var->get_init_expr()), "", false) );
                 if (ltsmin) append("}");
             }
             line( ";" );
@@ -1066,9 +942,9 @@ void dve_compiler::transition_effect( ext_transition_t *et, std::string in, std:
     if(et->synchronized)
     {
         for(size_int_t s = 0;s < et->first->get_sync_expr_list_size();s++) {
-            assign( cexpr( *et->first->get_sync_expr_list_item(s), out ),
-                    cexpr( *et->second->get_sync_expr_list_item(s), in ) );
-            line("cpy[((int*)&"+cexpr( *et->first->get_sync_expr_list_item(s), out )+" - (int*)&"+out+")] = 0;");
+            assign( cexpr( *et->first->get_sync_expr_list_item(s), out, false ),
+                    cexpr( *et->second->get_sync_expr_list_item(s), in, false ) );
+            line("cpy[((int*)&"+cexpr( *et->first->get_sync_expr_list_item(s), out, false )+" - (int*)&"+out+")] = 0;");
         }
     }
     else
@@ -1079,7 +955,7 @@ void dve_compiler::transition_effect( ext_transition_t *et, std::string in, std:
             for(size_int_t s = 0;s < et->first->get_sync_expr_list_size();s++)
             {
                 assign( channel_item_at( chan, channel_items( chan, in ), s, out ),
-                        cexpr( *et->first->get_sync_expr_list_item( s ), in ) );
+                        cexpr( *et->first->get_sync_expr_list_item( s ), in, false ) );
                 line("cpy[((int*)&"+channel_item_at( chan, channel_items( chan, in ), s, out )+" - (int*)&"+out+")] = 0;");
             }
             line( channel_items( chan, out ) + "++;" );
@@ -1087,9 +963,9 @@ void dve_compiler::transition_effect( ext_transition_t *et, std::string in, std:
         if(et->first->get_sync_mode() == SYNC_ASK_BUFFER)
         {
             for(size_int_t s = 0;s < et->first->get_sync_expr_list_size();s++) {
-                assign( cexpr( *et->first->get_sync_expr_list_item(s), out ),
+                assign( cexpr( *et->first->get_sync_expr_list_item(s), out, false ),
                         channel_item_at( chan, "0", s, in ) );
-                line("cpy[((int*)&"+cexpr( *et->first->get_sync_expr_list_item(s), out )+" - (int*)&"+out+")] = 0;");
+                line("cpy[((int*)&"+cexpr( *et->first->get_sync_expr_list_item(s), out, false )+" - (int*)&"+out+")] = 0;");
             }
             line( channel_items( chan, out ) + "--;" );
 
@@ -1113,7 +989,7 @@ void dve_compiler::transition_effect( ext_transition_t *et, std::string in, std:
 
     for(size_int_t e = 0;e < et->first->get_effect_count();e++) {
         print_cexpr( *et->first->get_effect(e), out );
-        line("cpy[((int*)&"+cexpr(*et->first->get_effect(e)->left(), out)+" - (int*)&"+out+")] = 0;");
+        line("cpy[((int*)&"+cexpr(*et->first->get_effect(e)->left(), out, false)+" - (int*)&"+out+")] = 0;");
     }
 
     if(et->synchronized) //second transiton effect
@@ -1123,7 +999,7 @@ void dve_compiler::transition_effect( ext_transition_t *et, std::string in, std:
         line("cpy[((int*)&"+process_state( et->second->get_process_gid(), out )+" - (int*)&"+out+")] = 0;");
         for(size_int_t e = 0;e < et->second->get_effect_count();e++) {
             print_cexpr( *et->second->get_effect(e), out );
-            line("cpy[((int*)&"+cexpr(*et->second->get_effect(e)->left(), out)+" - (int*)&"+out+")] = 0;");
+            line("cpy[((int*)&"+cexpr(*et->second->get_effect(e)->left(), out, false)+" - (int*)&"+out+")] = 0;");
         }
     }
 
@@ -1938,8 +1814,8 @@ void dve_compiler::gen_state_info()
 
 bool dve_compiler::eq_expr(dve_expression_t* e1, dve_expression_t* e2) {
     bool result = false;
-    const char* s1 = strdup(cexpr(*e1, "(..)").c_str());
-    const char* s2 = strdup(cexpr(*e2, "(..)").c_str());
+    const char* s1 = strdup(cexpr(*e1, "(..)", false).c_str());
+    const char* s2 = strdup(cexpr(*e2, "(..)", false).c_str());
     result = strcmp(s1, s2)==0;
     free((void*)s1);
     free((void*)s2);
@@ -2552,49 +2428,71 @@ void dve_compiler::gen_transition_info()
     block_end();
     line();
 
+    line("static int wrapped_div(int denom, jmp_buf* jbuf)");
+    block_begin();
+    line("if(denom == 0) longjmp(*jbuf, 1);");
+    line("return denom;");
+    block_end();
+
+    line();
+
+    line("static int wrapped_index(int index, int size, jmp_buf* jbuf)");
+    block_begin();
+    line("if(index < 0 || index >= size) longjmp(*jbuf, 1);");
+    line("return index;");
+    block_end();
+
+    line();
+
     // export the guard value for this state
     line ("extern \"C\" int get_guard(void* model, int g, state_struct_t* src) " );
     block_begin();
     line ("(void)model;");
-    line("switch(g)");
+
+    line("jmp_buf jbuf;");
+
+    line("if(!setjmp(jbuf))");
     block_begin();
-        for(int i=0; i<guard.size(); i++) {
-            switch(guard[i].type) {
-                case GUARD_PC:
-                    snprintf(buf, BUFLEN, "case %d: return (%s);", i, in_state(guard[i].pc.gid, guard[i].pc.lid, "(*src)").c_str());
-                    line(buf);
-                    break;
-                case GUARD_EXPR:
-                	snprintf(buf, BUFLEN, "case %d: return (0%s) ? 2 : ", i, cmaybe(*guard[i].expr.guard, "(*src)").c_str());
-                	line(buf);
-                    snprintf(buf, BUFLEN, "        (%s);", cexpr(*guard[i].expr.guard,"(*src)").c_str());
-                    line(buf);
-                    break;
-                case GUARD_CHAN:
-                    snprintf(buf, BUFLEN, "case %d: return (%s);", i, relate( channel_items(guard[i].chan.chan, "(*src)"), "!=",
-                        (guard[i].chan.sync_mode == SYNC_EXCLAIM_BUFFER? fmt( channel_capacity( guard[i].chan.chan ) ) : "0" ) ).c_str());
-                    line(buf);
-                    break;
-                case GUARD_COMMITED_FIRST:
-                    snprintf(buf, BUFLEN, "case %d:", i);
-                    line(buf);
-                    // committed state
-                    block_begin();
-                    if_begin( true );
 
-                    for(size_int_t p = 0; p < get_process_count(); p++)
-                        for(size_int_t c = 0; c < dynamic_cast<dve_process_t*>(get_process(p))->get_state_count(); c++)
-                            if(dynamic_cast<dve_process_t*>(get_process(p))->get_commited(c))
-                                if_clause( in_state( p, c, "(*src)" ) );
+        line("switch(g)");
+        block_begin();
+            for(int i=0; i<guard.size(); i++) {
+                switch(guard[i].type) {
+                    case GUARD_PC:
+                        snprintf(buf, BUFLEN, "case %d: return (%s);", i, in_state(guard[i].pc.gid, guard[i].pc.lid, "(*src)").c_str());
+                        line(buf);
+                        break;
+                    case GUARD_EXPR:
+                        snprintf(buf, BUFLEN, "case %d: return (%s);", i, cexpr(*guard[i].expr.guard,"(*src)", true).c_str());
+                        line(buf);
+                        break;
+                    case GUARD_CHAN:
+                        snprintf(buf, BUFLEN, "case %d: return (%s);", i, relate( channel_items(guard[i].chan.chan, "(*src)"), "!=",
+                            (guard[i].chan.sync_mode == SYNC_EXCLAIM_BUFFER? fmt( channel_capacity( guard[i].chan.chan ) ) : "0" ) ).c_str());
+                        line(buf);
+                        break;
+                    case GUARD_COMMITED_FIRST:
+                        snprintf(buf, BUFLEN, "case %d:", i);
+                        line(buf);
+                        // committed state
+                        block_begin();
+                        if_begin( true );
 
-                    if_end();
-                    line("    return 0;"); // bail out early
-                    line("return 1;");
-                    block_end();
-                    break;
+                        for(size_int_t p = 0; p < get_process_count(); p++)
+                            for(size_int_t c = 0; c < dynamic_cast<dve_process_t*>(get_process(p))->get_state_count(); c++)
+                                if(dynamic_cast<dve_process_t*>(get_process(p))->get_commited(c))
+                                    if_clause( in_state( p, c, "(*src)" ) );
+
+                        if_end();
+                        line("    return 0;"); // bail out early
+                        line("return 1;");
+                        block_end();
+                        break;
+                }
             }
-        }
+        block_end();
     block_end();
+    line("else return 2;");
     snprintf(buf, BUFLEN, "return false;");
     line(buf);
     block_end();
@@ -2603,43 +2501,9 @@ void dve_compiler::gen_transition_info()
     // export the guard value for this state
     line ("extern \"C\" void get_guard_all(void* model, state_struct_t* src, int* guard) " );
     block_begin();
-    line ("(void)model;");
     for(int i=0; i<guard.size(); i++) {
-        switch(guard[i].type) {
-            case GUARD_PC:
-                snprintf(buf, BUFLEN, "guard[%d] = (%s);", i, in_state(guard[i].pc.gid, guard[i].pc.lid, "(*src)").c_str());
-                line(buf);
-                break;
-            case GUARD_EXPR:
-            	snprintf(buf, BUFLEN, "guard[%d] = (0%s) ? 2 : ", i, cmaybe(*guard[i].expr.guard, "(*src)").c_str());
-            	line(buf);
-                snprintf(buf, BUFLEN, "        (%s);", cexpr(*guard[i].expr.guard,"(*src)").c_str());
-                line(buf);
-                break;
-            case GUARD_CHAN:
-                snprintf(buf, BUFLEN, "guard[%d] = (%s);", i, relate( channel_items(guard[i].chan.chan, "(*src)"), "!=",
-                    (guard[i].chan.sync_mode == SYNC_EXCLAIM_BUFFER? fmt( channel_capacity( guard[i].chan.chan ) ) : "0" ) ).c_str());
-                line(buf);
-                break;
-            case GUARD_COMMITED_FIRST:
-                // committed state
-                block_begin();
-                if_begin( true );
-
-                for(size_int_t p = 0; p < get_process_count(); p++)
-                    for(size_int_t c = 0; c < dynamic_cast<dve_process_t*>(get_process(p))->get_state_count(); c++)
-                        if(dynamic_cast<dve_process_t*>(get_process(p))->get_commited(c))
-                            if_clause( in_state( p, c, "(*src)" ) );
-
-                if_end();
-
-                snprintf(buf, BUFLEN, "    guard[%d] = 0;", i);
-                line(buf);
-                snprintf(buf, BUFLEN, "guard[%d] = 1;", i);
-                line(buf);
-                block_end();
-                break;
-        }
+        snprintf(buf, BUFLEN, "guard[%d] = get_guard(model, %d, src);", i, i);
+        line(buf);
     }
     block_end();
     line();
