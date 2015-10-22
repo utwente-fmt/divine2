@@ -10,8 +10,6 @@ using namespace wibble::str;
 
 namespace divine {
 
-static const size_t BUFLEN = 1024 * 16;
-
 const char *compile_defines_str = "\
 #define assert_eq(a,b) assert(a == b)\n\
 #define assert_neq(a,b) assert(a != b);\n\
@@ -386,8 +384,8 @@ void dve_compiler::gen_initial_state()
         line();
     } else {
 
-        char sep[2] = "";
-        char buf[BUFLEN];
+        std::string sep = "";
+        std::string buf;
         append( "state_struct_t initial_state = { " );
         for (size_int_t i=0; i!=state_creators_count; ++i)
         {
@@ -399,16 +397,16 @@ void dve_compiler::gen_initial_state()
                     {
                          for(size_int_t j=0; j<state_creators[i].array_size; j++)
                          {
-                            append(sep); sprintf(sep,",");
-                            snprintf(buf, BUFLEN, "%d", (initial_values_counts[state_creators[i].gid]?
+                            append(sep); sep = ",";
+                            buf = fmtf("%d", (initial_values_counts[state_creators[i].gid]?
                                                 initial_values[state_creators[i].gid].all_values[j]:0));
                             append(buf);
                          }
                     }
                     else
                     {
-                            append(sep); sprintf(sep,",");
-                            snprintf(buf, BUFLEN, "%d", (initial_values_counts[state_creators[i].gid]?
+                            append(sep); sep = ",";
+                            buf = fmtf("%d", (initial_values_counts[state_creators[i].gid]?
                                                 initial_values[state_creators[i].gid].all_value:0));
                             append(buf);
                     }
@@ -416,15 +414,15 @@ void dve_compiler::gen_initial_state()
                 break;
                 case state_creator_t::PROCESS_STATE:
                 {
-                    append(sep); sprintf(sep,",");
-                    snprintf(buf, BUFLEN, "%zu", initial_states[state_creators[i].gid]);
+                    append(sep); sep = ",";
+                    buf = fmtf("%zu", initial_states[state_creators[i].gid]);
                     append(buf);
                 }
                 break;
                 case state_creator_t::CHANNEL_BUFFER:
                 {
                     // initialize channel to 0
-                    append(sep); sprintf(sep,",");
+                    append(sep); sep = ",";
                     append("0"); // number_of_items 
 
                     dve_symbol_t * symbol =
@@ -455,14 +453,14 @@ void dve_compiler::output_dependency_comment( ext_transition_t &ext_transition, 
         return;
 
     int count = count_state_variables();
-    char buf[BUFLEN];
+    std::string buf;
 
     if (condition) {
         line();
         append("// read:         " );
         for(size_int_t i = 0; i < count; i++)
         {
-            snprintf(buf, BUFLEN, "%s%d", ((i==0)?"":","), ext_transition.sv_read[i]);
+            buf = fmtf("%s%d", ((i==0)?"":","), ext_transition.sv_read[i]);
             append(buf);
         }
         line();
@@ -470,7 +468,7 @@ void dve_compiler::output_dependency_comment( ext_transition_t &ext_transition, 
         append("// actions_read: " );
         for(size_int_t i = 0; i < count; i++)
         {
-            snprintf(buf, BUFLEN, "%s%d", ((i==0)?"":","), ext_transition.sv_actions_read[i]);
+            buf = fmtf("%s%d", ((i==0)?"":","), ext_transition.sv_actions_read[i]);
             append(buf);
         }
         line();
@@ -478,7 +476,7 @@ void dve_compiler::output_dependency_comment( ext_transition_t &ext_transition, 
         append("// actions_read: " );
         for(size_int_t i = 0; i < count; i++)
         {
-            snprintf(buf, BUFLEN, "%s%d", ((i==0)?"":","), ext_transition.sv_actions_read[i]);
+            buf = fmtf("%s%d", ((i==0)?"":","), ext_transition.sv_actions_read[i]);
             append(buf);
         }
         line();
@@ -486,7 +484,7 @@ void dve_compiler::output_dependency_comment( ext_transition_t &ext_transition, 
         append("// may-write:    " );
         for(size_int_t i = 0; i < count; i++)
         {
-            snprintf(buf, BUFLEN, "%s%d", ((i==0)?"":","), ext_transition.sv_may_write[i]);
+            buf = fmtf("%s%d", ((i==0)?"":","), ext_transition.sv_may_write[i]);
             append(buf);
         }
         line();
@@ -494,7 +492,7 @@ void dve_compiler::output_dependency_comment( ext_transition_t &ext_transition, 
         append("// must-write:   " );
         for(size_int_t i = 0; i < count; i++)
         {
-            snprintf(buf, BUFLEN, "%s%d", ((i==0)?"":","), ext_transition.sv_must_write[i]);
+            buf = fmtf("%s%d", ((i==0)?"":","), ext_transition.sv_must_write[i]);
             append(buf);
         }
         line();
@@ -1496,11 +1494,11 @@ void dve_compiler::print_generator()
 
 void dve_compiler::gen_state_info()
 {
-    char buf[BUFLEN];
+    std::string buf;
     // number of variables in the state
     line( "extern \"C\" int get_state_variable_count() " );
     block_begin();
-    snprintf(buf, BUFLEN, "return %d;", count_state_variables());
+    buf = fmtf("return %d;", count_state_variables());
     line(buf);
     block_end();
     line();
@@ -1519,7 +1517,7 @@ void dve_compiler::gen_state_info()
     int k=0;
     for (size_int_t i=0; i<state_creators_count; ++i, ++k)
     {
-        snprintf(buf, BUFLEN, "case %d:", k);
+        buf = fmtf("case %d:", k);
         line(buf);
 
         switch (state_creators[i].type)
@@ -1532,10 +1530,10 @@ void dve_compiler::gen_state_info()
                 {
                     for(size_int_t j=0; j < state_creators[i].array_size; ++j)
                     {
-                        snprintf(buf, BUFLEN, "    return \"%s[%zu]\";", name.c_str(), j);
+                        buf = fmtf("    return \"%s[%zu]\";", name.c_str(), j);
                         line(buf);
                         if (j < state_creators[i].array_size - 1) {
-                            snprintf(buf, BUFLEN, "case %d:", ++k);
+                            buf = fmtf("case %d:", ++k);
                             line(buf);
                         }
                     }
@@ -1550,7 +1548,7 @@ void dve_compiler::gen_state_info()
             case state_creator_t::CHANNEL_BUFFER:
             {
                 name = get_symbol_table()->get_channel(state_creators[i].gid)->get_name();
-                snprintf(buf, BUFLEN, "    return \"%s.number_of_items\";", name.c_str());
+                buf = fmtf("    return \"%s.number_of_items\";", name.c_str());
                 line(buf);
 
                 dve_symbol_t * symbol =
@@ -1561,9 +1559,9 @@ void dve_compiler::gen_state_info()
                 {
                     for (size_int_t j=0; j<item_count; ++j)
                     {
-                        snprintf(buf, BUFLEN, "case %d:", ++k);
+                        buf = fmtf("case %d:", ++k);
                         line(buf);
-                        snprintf(buf, BUFLEN, "    return \"%s[%zu].x%zu\";", name.c_str(), i,j);
+                        buf = fmtf("    return \"%s[%zu].x%zu\";", name.c_str(), i,j);
                         line(buf);
                     }
                 }
@@ -1573,7 +1571,7 @@ void dve_compiler::gen_state_info()
                 break;
         };
 
-        snprintf(buf, BUFLEN, "    return \"%s\";", name.c_str());
+        buf = fmtf("    return \"%s\";", name.c_str());
         line(buf);
     }
 
@@ -1667,7 +1665,7 @@ void dve_compiler::gen_state_info()
     {
         string type_name = "UNINITIALIZED";
 
-        snprintf(buf, BUFLEN, "case %d:", k);
+        buf = fmtf("case %d:", k);
         line(buf);
 
         switch (state_creators[i].type)
@@ -1681,9 +1679,9 @@ void dve_compiler::gen_state_info()
                 {
                     for(size_int_t j=0; j < state_creators[i].array_size - 1; ++j)
                     {
-                        snprintf(buf, BUFLEN, "    return %d;", type_no[type_name]);
+                        buf = fmtf("    return %d;", type_no[type_name]);
                         line(buf);
-                        snprintf(buf, BUFLEN, "case %d:", ++k);
+                        buf = fmtf("case %d:", ++k);
                         line(buf);
                     }
                 }
@@ -1694,7 +1692,7 @@ void dve_compiler::gen_state_info()
                 break;
             case state_creator_t::CHANNEL_BUFFER:
             {
-                snprintf(buf, BUFLEN, "    return %d;", type_no["int"]);
+                buf = fmtf("    return %d;", type_no["int"]);
                 line(buf);
 
                 dve_symbol_t * symbol =
@@ -1705,14 +1703,14 @@ void dve_compiler::gen_state_info()
                 {
                     for (size_int_t j=0; j<item_count; ++j)
                     {
-                        snprintf(buf, BUFLEN, "case %d:", ++k);
+                        buf = fmtf("case %d:", ++k);
                         line(buf);
                         if (symbol->get_channel_type_list_item(j) == VAR_BYTE)
                         {
-                            snprintf(buf, BUFLEN, "    return %d;", type_no["byte"]);
+                            buf = fmtf("    return %d;", type_no["byte"]);
                             line(buf);
                         } else {
-                            snprintf(buf, BUFLEN, "    return %d;", type_no["int"]);
+                            buf = fmtf("    return %d;", type_no["int"]);
                             line(buf);
                         }
                     }
@@ -1723,7 +1721,7 @@ void dve_compiler::gen_state_info()
                 break;
         };
 
-        snprintf(buf, BUFLEN, "    return %d;", type_no[type_name]);
+        buf = fmtf("    return %d;", type_no[type_name]);
         line(buf);
     }
 
@@ -1738,7 +1736,7 @@ void dve_compiler::gen_state_info()
     // number of different types in the state
     line( "extern \"C\" int get_state_variable_type_count() " );
     block_begin();
-    snprintf(buf, BUFLEN, "return %d;", type_count);
+    buf = fmtf("return %d;", type_count);
     line(buf);
     block_end();
     line();
@@ -1750,9 +1748,9 @@ void dve_compiler::gen_state_info()
         block_begin();
         for(std::map<string, int>::iterator ix = type_no.begin(); ix != type_no.end(); ++ix)
         {
-            snprintf(buf, BUFLEN, "case %d:", ix->second);
+            buf = fmtf("case %d:", ix->second);
             line(buf);
-            snprintf(buf, BUFLEN, "    return \"%s\";", ix->first.c_str());
+            buf = fmtf("    return \"%s\";", ix->first.c_str());
             line(buf);
         }
         line("default:");
@@ -1768,9 +1766,9 @@ void dve_compiler::gen_state_info()
         block_begin();
         for(std::map<string, int>::iterator ix = type_no.begin(); ix != type_no.end(); ++ix)
         {
-            snprintf(buf, BUFLEN, "case %d: // %s", ix->second, ix->first.c_str());
+            buf = fmtf("case %d: // %s", ix->second, ix->first.c_str());
             line(buf);
-            snprintf(buf, BUFLEN, "    return %zu;", type_value[ix->first].size());
+            buf = fmtf("    return %zu;", type_value[ix->first].size());
             line(buf);
         }
         line("default:");
@@ -1788,16 +1786,16 @@ void dve_compiler::gen_state_info()
         {
             if (type_value[ix->first].size())
             {
-                snprintf(buf, BUFLEN, "case %d:", ix->second);
+                buf = fmtf("case %d:", ix->second);
                 line(buf);
                 block_begin();
                     line("switch (value)");
                     block_begin();
                     for(int i=0; i < type_value[ix->first].size(); ++i)
                     {
-                        snprintf(buf, BUFLEN, "case %d:", i);
+                        buf = fmtf("case %d:", i);
                         line(buf);
-                        snprintf(buf, BUFLEN, "    return \"%s\";", type_value[ix->first][i].c_str());
+                        buf = fmtf("    return \"%s\";", type_value[ix->first][i].c_str());
                         line(buf);
                     }
                     block_end();
@@ -2011,7 +2009,7 @@ void dve_compiler::gen_transition_info()
 
     int sv_count = count_state_variables();
     bool has_commited = false;
-    char buf[BUFLEN];
+    std::string buf;
 
     // initialize read/write dependency vector
     std::vector<int> c_base_sv_read(sv_count);
@@ -2266,7 +2264,7 @@ void dve_compiler::gen_transition_info()
     }
 
     // output transition vectors
-    snprintf(buf, BUFLEN, "int transition_dependency[][3][%d] = ", sv_count);
+    buf = fmtf("int transition_dependency[][3][%d] = ", sv_count);
     line(buf);
     block_begin();
     line("// { ... read ...}, { ... may-write ...}, { ... must-write ...}");
@@ -2277,19 +2275,19 @@ void dve_compiler::gen_transition_info()
         append("{{" );
         for(size_int_t j = 0; j < sv_count; j++)
         {
-            snprintf(buf, BUFLEN, "%s%d", ((j==0)?"":","), transition_read_set[i][j]?1:0 );
+            buf = fmtf("%s%d", ((j==0)?"":","), transition_read_set[i][j]?1:0 );
             append(buf);
         }
         append("},{" );
         for(size_int_t j = 0; j < sv_count; j++)
         {
-            snprintf(buf, BUFLEN, "%s%d", ((j==0)?"":","), current.sv_may_write[j] );
+            buf = fmtf("%s%d", ((j==0)?"":","), current.sv_may_write[j] );
             append(buf);
         }
         append("},{" );
         for(size_int_t j = 0; j < sv_count; j++)
         {
-            snprintf(buf, BUFLEN, "%s%d", ((j==0)?"":","), current.sv_must_write[j] );
+            buf = fmtf("%s%d", ((j==0)?"":","), current.sv_must_write[j] );
             append(buf);
         }
         append("}}");
@@ -2300,7 +2298,7 @@ void dve_compiler::gen_transition_info()
     line();
 
     // output action reads vectors
-    snprintf(buf, BUFLEN, "int actions_read[][%d] = ", sv_count);
+    buf = fmtf("int actions_read[][%d] = ", sv_count);
     line(buf);
     block_begin();
 
@@ -2310,7 +2308,7 @@ void dve_compiler::gen_transition_info()
         append("{" );
         for(size_int_t j = 0; j < sv_count; j++)
         {
-            snprintf(buf, BUFLEN, "%s%d", ((j==0)?"":","), transition_actions_read_set[i][j]?1:0 );
+            buf = fmtf("%s%d", ((j==0)?"":","), transition_actions_read_set[i][j]?1:0 );
             append(buf);
         }
         append("}" );
@@ -2323,7 +2321,7 @@ void dve_compiler::gen_transition_info()
     // number of transitions
     line( "extern \"C\" int get_transition_count() " );
     block_begin();
-    snprintf(buf, BUFLEN, "return %zu;", transitions.size());
+    buf = fmtf("return %zu;", transitions.size());
     line(buf);
     block_end();
     line();
@@ -2331,9 +2329,9 @@ void dve_compiler::gen_transition_info()
     // read dependencies
     line( "extern \"C\" const int* get_transition_read_dependencies(int t) " );
     block_begin();
-    snprintf(buf, BUFLEN, "if (t>=0 && t < %zu) return transition_dependency[t][0];", transitions.size());
+    buf = fmtf("if (t>=0 && t < %zu) return transition_dependency[t][0];", transitions.size());
     line(buf);
-    snprintf(buf, BUFLEN, "return NULL;");
+    buf = fmtf("return NULL;");
     line(buf);
     block_end();
     line();
@@ -2341,9 +2339,9 @@ void dve_compiler::gen_transition_info()
     // actions read dependencies
     line( "extern \"C\" const int* get_transition_actions_read_dependencies(int t) " );
     block_begin();
-    snprintf(buf, BUFLEN, "if (t>=0 && t < %zu) return actions_read[t];", transitions.size());
+    buf = fmtf("if (t>=0 && t < %zu) return actions_read[t];", transitions.size());
     line(buf);
-    snprintf(buf, BUFLEN, "return NULL;");
+    buf = fmtf("return NULL;");
     line(buf);
     block_end();
     line();
@@ -2351,9 +2349,9 @@ void dve_compiler::gen_transition_info()
     // may_write dependencies
     line( "extern \"C\" const int* get_transition_may_write_dependencies(int t) " );
     block_begin();
-    snprintf(buf, BUFLEN, "if (t>=0 && t < %zu) return transition_dependency[t][1];", transitions.size());
+    buf = fmtf("if (t>=0 && t < %zu) return transition_dependency[t][1];", transitions.size());
     line(buf);
-    snprintf(buf, BUFLEN, "return NULL;");
+    buf = fmtf("return NULL;");
     line(buf);
     block_end();
     line();
@@ -2368,9 +2366,9 @@ void dve_compiler::gen_transition_info()
     // must_write dependencies
     line( "extern \"C\" const int* get_transition_must_write_dependencies(int t) " );
     block_begin();
-    snprintf(buf, BUFLEN, "if (t>=0 && t < %zu) return transition_dependency[t][2];", transitions.size());
+    buf = fmtf("if (t>=0 && t < %zu) return transition_dependency[t][2];", transitions.size());
     line(buf);
-    snprintf(buf, BUFLEN, "return NULL;");
+    buf = fmtf("return NULL;");
     line(buf);
     block_end();
     line();
@@ -2386,12 +2384,12 @@ void dve_compiler::gen_transition_info()
     for(size_int_t i = 0; i < transitions.size(); i++) {
         ext_transition_t& current = transitions[i];
         if (current.synchronized) {
-            snprintf(buf, BUFLEN, "case %zu: return ((%s) && (%s));", i,
+            buf = fmtf("case %zu: return ((%s) && (%s));", i,
                 in_state(current.first->get_process_gid(), current.first->get_state1_lid(), "(*in)").c_str(),
                 in_state(current.second->get_process_gid(), current.second->get_state1_lid(), "(*in)").c_str());
             line(buf);
         } else {
-            snprintf(buf, BUFLEN, "case %zu: return (%s);", i, in_state(current.first->get_process_gid(), current.first->get_state1_lid(), "(*in)").c_str());
+            buf = fmtf("case %zu: return (%s);", i, in_state(current.first->get_process_gid(), current.first->get_state1_lid(), "(*in)").c_str());
             line(buf);
         }
     }
@@ -2412,12 +2410,12 @@ void dve_compiler::gen_transition_info()
     for(size_int_t i = 0; i < transitions.size(); i++) {
         ext_transition_t& current = transitions[i];
         if (current.synchronized) {
-            snprintf(buf, BUFLEN, "case %zu: *pid0 = %zu; *lid0=%zu; *pid1 = %zu; *lid1 = %zu; return;", i,
+            buf = fmtf("case %zu: *pid0 = %zu; *lid0=%zu; *pid1 = %zu; *lid1 = %zu; return;", i,
                 current.first->get_process_gid(), current.first->get_state1_lid(),
                 current.second->get_process_gid(), current.second->get_state1_lid());
             line(buf);
         } else {
-            snprintf(buf, BUFLEN, "case %zu: *pid0 = %zu; *lid0 = %zu; *pid1 = -1; *lid1 = -1; return;", i, current.first->get_process_gid(), current.first->get_state1_lid());
+            buf = fmtf("case %zu: *pid0 = %zu; *lid0 = %zu; *pid1 = -1; *lid1 = -1; return;", i, current.first->get_process_gid(), current.first->get_state1_lid());
             line(buf);
         }
     }
@@ -2459,20 +2457,20 @@ void dve_compiler::gen_transition_info()
             for(int i=0; i<guard.size(); i++) {
                 switch(guard[i].type) {
                     case GUARD_PC:
-                        snprintf(buf, BUFLEN, "case %d: return (%s);", i, in_state(guard[i].pc.gid, guard[i].pc.lid, "(*src)").c_str());
+                        buf = fmtf("case %d: return (%s);", i, in_state(guard[i].pc.gid, guard[i].pc.lid, "(*src)").c_str());
                         line(buf);
                         break;
                     case GUARD_EXPR:
-                        snprintf(buf, BUFLEN, "case %d: return (%s);", i, cexpr(*guard[i].expr.guard,"(*src)", true).c_str());
+                        buf = fmtf("case %d: return (%s);", i, cexpr(*guard[i].expr.guard,"(*src)", true).c_str());
                         line(buf);
                         break;
                     case GUARD_CHAN:
-                        snprintf(buf, BUFLEN, "case %d: return (%s);", i, relate( channel_items(guard[i].chan.chan, "(*src)"), "!=",
+                        buf = fmtf("case %d: return (%s);", i, relate( channel_items(guard[i].chan.chan, "(*src)"), "!=",
                             (guard[i].chan.sync_mode == SYNC_EXCLAIM_BUFFER? fmt( channel_capacity( guard[i].chan.chan ) ) : "0" ) ).c_str());
                         line(buf);
                         break;
                     case GUARD_COMMITED_FIRST:
-                        snprintf(buf, BUFLEN, "case %d:", i);
+                        buf = fmtf("case %d:", i);
                         line(buf);
                         // committed state
                         block_begin();
@@ -2493,7 +2491,7 @@ void dve_compiler::gen_transition_info()
         block_end();
     block_end();
     line("else return 2;");
-    snprintf(buf, BUFLEN, "return false;");
+    buf = fmtf("return false;");
     line(buf);
     block_end();
     line();
@@ -2502,7 +2500,7 @@ void dve_compiler::gen_transition_info()
     line ("extern \"C\" void get_guard_all(void* model, state_struct_t* src, int* guard) " );
     block_begin();
     for(int i=0; i<guard.size(); i++) {
-        snprintf(buf, BUFLEN, "guard[%d] = get_guard(model, %d, src);", i, i);
+        buf = fmtf("guard[%d] = get_guard(model, %d, src);", i, i);
         line(buf);
     }
     block_end();
@@ -2511,26 +2509,26 @@ void dve_compiler::gen_transition_info()
     // export the number of guards
     line ("extern \"C\" const int get_guard_count() " );
     block_begin();
-    snprintf(buf, BUFLEN, "return %zu;", guard.size());
+    buf = fmtf("return %zu;", guard.size());
     line(buf);
     block_end();
     line();
 
-    snprintf(buf, BUFLEN, "int* guards_per_transition[%zu] = ", transitions.size() );
+    buf = fmtf("int* guards_per_transition[%zu] = ", transitions.size() );
     line(buf);
     block_begin();
         for(int i=0; i < transitions.size(); i++) {
             vector<int>& gs = guards[i];
 
-            snprintf(buf, BUFLEN, "((int[]){");
+            buf = fmtf("((int[]){");
             append(buf);
-            snprintf(buf, BUFLEN, "%zu", gs.size());
+            buf = fmtf("%zu", gs.size());
             append(buf);
             for(vector<int>::iterator ix = gs.begin(); ix != gs.end(); ix++) {
-                snprintf(buf, BUFLEN, ", %d", *ix);
+                buf = fmtf(", %d", *ix);
                 append(buf);
             }
-            snprintf(buf, BUFLEN, "}), // %d", i );
+            buf = fmtf("}), // %d", i );
             line(buf);
         }
     block_end();
@@ -2540,7 +2538,7 @@ void dve_compiler::gen_transition_info()
     // export the guards per transition group
     line ("extern \"C\" const int* get_guards(int t) " );
     block_begin();
-    snprintf(buf, BUFLEN, "if (t>=0 && t < %zu) return guards_per_transition[t];", transitions.size());
+    buf = fmtf("if (t>=0 && t < %zu) return guards_per_transition[t];", transitions.size());
     line(buf);
     line("return NULL;");
     block_end();
@@ -2556,7 +2554,7 @@ void dve_compiler::gen_transition_info()
     // EXPORT THE GUARD MATRIX     //
     /////////////////////////////////
 
-    snprintf(buf, BUFLEN, "int guard[][%d] = ", sv_count);
+    buf = fmtf("int guard[][%d] = ", sv_count);
     line(buf);
     block_begin();
         for(int i=0; i<guard.size(); i++) {
@@ -2566,7 +2564,7 @@ void dve_compiler::gen_transition_info()
             // guard
             for(size_int_t i = 0; i < sv_count; i++)
             {
-                snprintf(buf, BUFLEN, "%s%d", ((i==0)?"":","), per_guard_matrix[i]);
+                buf = fmtf("%s%d", ((i==0)?"":","), per_guard_matrix[i]);
                 append(buf);
             }
             append("}" );
@@ -2579,9 +2577,9 @@ void dve_compiler::gen_transition_info()
     // export the guard matrix
     line ("extern \"C\" const int* get_guard_matrix(int g) " );
     block_begin();
-    snprintf(buf, BUFLEN, "if (g>=0 && g < %zu) return guard[g];", guard.size());
+    buf = fmtf("if (g>=0 && g < %zu) return guard[g];", guard.size());
     line(buf);
-    snprintf(buf, BUFLEN, "return NULL;");
+    buf = fmtf("return NULL;");
     line(buf);
     block_end();
     line();
@@ -2596,7 +2594,7 @@ void dve_compiler::gen_transition_info()
     //////////////////////////////////////////
 
     // guard may be co-enabled matrix (#guards x #guards)
-    snprintf(buf, BUFLEN, "int guardmaybecoenabled[%zu][%zu] = ", guard.size(), guard.size());
+    buf = fmtf("int guardmaybecoenabled[%zu][%zu] = ", guard.size(), guard.size());
     line(buf);
     block_begin();
     for(size_int_t i=0; i < guard.size(); i++) {
@@ -2625,9 +2623,9 @@ void dve_compiler::gen_transition_info()
     // may be co-enabled function
     line ("extern \"C\" const int* get_guard_may_be_coenabled_matrix(int g) " );
     block_begin();
-    snprintf(buf, BUFLEN, "if (g>=0 && g < %zu) return guardmaybecoenabled[g];", guard.size());
+    buf = fmtf("if (g>=0 && g < %zu) return guardmaybecoenabled[g];", guard.size());
     line(buf);
-    snprintf(buf, BUFLEN, "return NULL;");
+    buf = fmtf("return NULL;");
     line(buf);
     block_end();
     line();
@@ -2637,7 +2635,7 @@ void dve_compiler::gen_transition_info()
     ///////////////////////////////////////////////
 
     // guard nes matrix (#guards x #transitions)
-    snprintf(buf, BUFLEN, "int guard_nes[%zu][%zu] = ", guard.size(), transitions.size());
+    buf = fmtf("int guard_nes[%zu][%zu] = ", guard.size(), transitions.size());
     line(buf);
     block_begin();
     count = 0;
@@ -2662,9 +2660,9 @@ void dve_compiler::gen_transition_info()
     // guard nes function
     line ("extern \"C\" const int* get_guard_nes_matrix(int g) " );
     block_begin();
-    snprintf(buf, BUFLEN, "if (g>=0 && g < %zu) return guard_nes[g];", guard.size());
+    buf = fmtf("if (g>=0 && g < %zu) return guard_nes[g];", guard.size());
     line(buf);
-    snprintf(buf, BUFLEN, "return NULL;");
+    buf = fmtf("return NULL;");
     line(buf);
     block_end();
     line();
@@ -2674,7 +2672,7 @@ void dve_compiler::gen_transition_info()
     ////////////////////////////////////////////////
 
     // guard nes matrix (#guards x #transitions)
-    snprintf(buf, BUFLEN, "int guard_nds[%zu][%zu] = ", guard.size(), transitions.size());
+    buf = fmtf("int guard_nds[%zu][%zu] = ", guard.size(), transitions.size());
     line(buf);
     block_begin();
     count = 0;
@@ -2699,9 +2697,9 @@ void dve_compiler::gen_transition_info()
     // guard nes function
     line ("extern \"C\" const int* get_guard_nds_matrix(int g) " );
     block_begin();
-    snprintf(buf, BUFLEN, "if (g>=0 && g < %zu) return guard_nds[g];", guard.size());
+    buf = fmtf("if (g>=0 && g < %zu) return guard_nds[g];", guard.size());
     line(buf);
-    snprintf(buf, BUFLEN, "return NULL;");
+    buf = fmtf("return NULL;");
     line(buf);
     block_end();
     line();
@@ -2712,7 +2710,7 @@ void dve_compiler::gen_transition_info()
     ////////////////////////////////////////////////
 
     // guard do not accord matrix (#transitions x #transitions)
-    snprintf(buf, BUFLEN, "int dna[%zu][%zu] = ", transitions.size(), transitions.size());
+    buf = fmtf("int dna[%zu][%zu] = ", transitions.size(), transitions.size());
     line(buf);
     block_begin();
     count = 0;
@@ -2738,9 +2736,9 @@ void dve_compiler::gen_transition_info()
     // guard dna function
     line ("extern \"C\" const int* get_dna_matrix(int t) " );
     block_begin();
-    snprintf(buf, BUFLEN, "if (t >= 0 && t < %zu) return dna[t];", transitions.size());
+    buf = fmtf("if (t >= 0 && t < %zu) return dna[t];", transitions.size());
     line(buf);
-    snprintf(buf, BUFLEN, "return NULL;");
+    buf = fmtf("return NULL;");
     line(buf);
     block_end();
     line();
