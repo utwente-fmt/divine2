@@ -1015,6 +1015,9 @@ void dve_compiler::transition_effect( ext_transition_t *et, std::string in, std:
 void dve_compiler::new_output_state() {
     if (ltsmin) {
             line( "*out = *in;" );
+            append( "int cpy[" + fmt(count_state_variables())+ "] = { " );
+            for (int i = 0; i < count_state_variables(); i++) append ("1,");
+            line("};");
     } else {
         line( "divine::Blob blob_out( *(setup->pool), setup->slack + state_size );" );
         line( "state_struct_t *out = &blob_out.get< state_struct_t >( setup->slack );" );
@@ -1366,9 +1369,6 @@ void dve_compiler::print_generator()
         line( "int states_emitted = 0;" );
         line( "state_struct_t tmp;" );
         line( "state_struct_t *out = &tmp;" );
-        append( "int cpy[" + fmt(count_state_variables())+ "] = { " );
-        for (int i = 0; i < count_state_variables(); i++) append ("1,");
-        line("};");
         line( "goto switch_state;" );
         gen_ltsmin_successors(false);
         // switch block
