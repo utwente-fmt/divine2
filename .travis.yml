@@ -1,0 +1,39 @@
+language: cpp
+sudo: false
+
+compiler:
+#- clang-3.4
+- gcc-4.9
+
+os:
+- linux
+#- osx
+
+env:
+
+addons:
+  apt:
+    sources:
+    - ubuntu-toolchain-r-test
+    packages:
+    - build-essential
+    - gcc-4.9
+    - g++-4.9
+    - clang-3.4
+    - cmake
+
+before install:
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update; fi
+  
+before_script:
+- export CC=gcc-4.9
+- export CXX=g++-4.9
+
+script:
+- ./configure
+- cd _build
+- cmake .
+- make
+
+notifications:
+  email: false
