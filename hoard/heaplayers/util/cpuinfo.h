@@ -213,7 +213,8 @@ int CPUInfo::getThreadId (void) {
 #elif defined(__linux) || defined(PTHREAD_KEYS_MAX)
   // Consecutive thread id's in Linux are 1024 apart;
   // dividing off the 1024 gives us an appropriate thread id.
-  return (int) pthread_self() >> 10; // >> 20; // FIX ME 10 // (>> 10 = / 1024)
+//  return (int) pthread_self() >> 10; // >> 20; // FIX ME 10 // (>> 10 = / 1024)
+  return -1;
 #elif defined(POSIX) // FIX ME??
   return (int) pthread_self();
 #elif USE_SPROC
