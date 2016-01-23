@@ -1,0 +1,62 @@
+language: cpp
+sudo: false
+
+compiler:
+- gcc
+- clang
+
+os:
+- linux
+- osx
+
+#osx_image: xcode7.2
+
+env:
+
+matrix:
+  exclude:
+    - compiler: clang
+      os: osx
+ 
+addons:
+  apt:
+    sources:
+    - ubuntu-toolchain-r-test
+    packages:
+    - build-essential
+    - gcc-4.9
+    - g++-4.9
+    - clang-3.4
+    - cmake
+    
+before_install:
+- if [ "$TRAVIS_OS_NAME" = "osx" ]; then brew update; fi
+#- if [ "$TRAVIS_OS_NAME" = "osx" ]; then brew install gcc49; fi
+#- if [ "$TRAVIS_OS_NAME" = "osx" ]; then brew install cmake; fi
+
+before_script:
+- if [ "$CC" = "gcc" ]; then export CC=gcc-4.9; fi
+- if [ "$CXX" = "g++" ]; then export CXX=g++-4.9; fi
+
+script:
+- "./configure"
+- cd _build
+- cmake -DCMAKE_INSTALL_PREFIX:PATH=/tmp/dist .
+- make -j2
+- make install ; echo "may fail"
+- export distname="divine2-ltsmin-$TRAVIS_TAG-$TRAVIS_OS_NAME-$CC"
+- cd /tmp/dist
+- tar cfz "$distname.tgz" *
+  
+deploy:
+  provider: releases
+  api_key:
+    secure: SQLuCaa5Z8SAzVAuMm08XKC8tv27hX3RzOxo6UpyxSh8LOJA5oy1RNISvHSN7/jeQaQmrV+OyAvVjsaPxbxeDgLfgPYiQUMV36TXEq1R4aPyoKyoEE+cH2M9jpX3TvIq7S070oq5t+986Ntt6bVRSnsUEOTSsUs05SNMNNcOxeVQ9mDJ06Bsc6AUJw99pGQpov2J6E5d1Ez4EfWp5jdfER7WuaCfczfdXMkK3S9BjqodIWQnGmWrpXOPj1viD711aLtenIguRc40KfecZf+tEJFmy5P1nIl/Ryv/6rv1nlfXB8KfKdxTJpb40BZqfvM2ObbujHviqlMWr/ZiCPZbcUeZnt+RagCy7u6WW2vU4YoAOdc5rL+U+hR6V2jAuoGpYLuw6L76T4YAoQcpO+lLXtMvwJhHdll1Yspidgt9uco+yFv1QKNa5UzqFHn69NxekZgf/z6+z642FDE8gUKkt8qUsYF/Ia605bwi3ZbC6PjRQzN9S0u92uA6Mr8q2/1LzvMSQIvzhFF9+YVQiW7H2DsB4W5ImiabM9TmpZ3TeYJyObFNqa5LouCieAI7L5GQyYPjjQ1pCWznZrbrT6/bAzda5dR6bg51YwzeEX8Zp7A+pmLtUkau+8uB/el0pyApSGY0DF8lz44zKe9DRIoUCFBLP4D4jnU/7uqW5ALfYPg=
+  file: "/tmp/dist/$distname.tgz"
+  skip_cleanup: true
+  on:
+    repo: utwente-fmt/divine2
+    tags: true
+
+notifications:
+  email: false
