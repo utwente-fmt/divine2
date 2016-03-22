@@ -2170,17 +2170,17 @@ void dve_compiler::gen_transition_info()
         std::vector<bool> tmp(transitions.size());
         transition_coenabled[i] = tmp;
 
-        // for each guard of transition i
-        for(vector<int>::iterator ix = gs.begin(); ix != gs.end(); ix++) {
-            // check coenabledness with each guard of transition j
-            for(size_int_t j=0; j < transitions.size(); j++) {
-                bool coenabled = true;
-                vector<int> &gs2 = guards[j];
-                for(vector<int>::iterator iy = gs2.begin(); iy != gs2.end(); iy++) {
-                     coenabled &= may_be_coenabled(guard[*ix], guard[*iy]);
+        // check coenabledness with each guard of transition j
+        for(size_int_t j=0; j < transitions.size(); j++) {
+            bool coenabled = true;
+            vector<int> &gs2 = guards[j];
+            // for each guard of transition i
+            for(vector<int>::iterator ix = gs.begin(); ix != gs.end() && coenabled; ix++) {
+                for(vector<int>::iterator iy = gs2.begin(); iy != gs2.end() && coenabled; iy++) {
+                    coenabled &= may_be_coenabled(guard[*ix], guard[*iy]);
                 }
-                transition_coenabled[i][j] = coenabled;
             }
+            transition_coenabled[i][j] = coenabled;
         }
     }
 
@@ -2990,9 +2990,8 @@ dve_compiler::get_assignment ( dve_expression_t & expr,
         if ( !get_const_varname(*expr.left(), sp.variable_name) )
             return false;
 
-        analyse_expression (*expr.left(), tmp, tmp.sv_read);
-        analyse_expression (*expr.left(), tmp, tmp.sv_actions_read);
-        if (!dependent(tmp.sv_read, deps))
+        analyse_expression (expr, tmp, tmp.sv_read /* bogus */);
+        if (!dependent(tmp.sv_read, deps) && !dependent(tmp.sv_may_write, deps))
             return true; // no need to add
 
         if ( get_const_expression(*expr.right(), sp.variable_value) )
@@ -3007,13 +3006,13 @@ dve_compiler::get_assignment ( dve_expression_t & expr,
             switch (expr.right()->get_operator()) { // x = x + 1  AND  x = x - 1
             case T_PLUS: case T_MINUS:
                 if ( !get_const_varname(*expr.right()->left(), other) )
-                    return NULL;
+                    return false;
                 if (other != sp.variable_name)
-                    return NULL;
+                    return false;
                 if ( !get_const_expression(*expr.right()->right(), sp.variable_value) )
-                    return NULL;
+                    return false;
                 if (sp.variable_value != 1)
-                    return NULL;
+                    return false;
                 sp.relation = PRED_GT; // ++ / --
                 p.push_back(sp);
                 return true;
