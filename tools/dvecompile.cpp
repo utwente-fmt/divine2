@@ -2376,56 +2376,6 @@ void dve_compiler::gen_transition_info()
     /////////////////////////////////////
     /////////////////////////////////////
 
-    // write get_active
-    line( "extern \"C\" int get_active( state_struct_t *in, int t ) " );
-    block_begin();
-    line("switch(t)");
-    block_begin();
-    for(size_int_t i = 0; i < transitions.size(); i++) {
-        ext_transition_t& current = transitions[i];
-        if (current.synchronized) {
-            buf = fmtf("case %zu: return ((%s) && (%s));", i,
-                in_state(current.first->get_process_gid(), current.first->get_state1_lid(), "(*in)").c_str(),
-                in_state(current.second->get_process_gid(), current.second->get_state1_lid(), "(*in)").c_str());
-            line(buf);
-        } else {
-            buf = fmtf("case %zu: return (%s);", i, in_state(current.first->get_process_gid(), current.first->get_state1_lid(), "(*in)").c_str());
-            line(buf);
-        }
-    }
-    block_end();
-    line("return false;");
-    block_end();
-    line();
-
-    /////////////////////////////////////
-    /////////////////////////////////////
-
-    // write get_group_pid (process id)
-    // note: just for testing conflict reduction strategy
-    line( "extern \"C\" void get_group_pid_lid( int t, int* pid0, int* lid0, int* pid1, int* lid1 ) " );
-    block_begin();
-    line("switch(t)");
-    block_begin();
-    for(size_int_t i = 0; i < transitions.size(); i++) {
-        ext_transition_t& current = transitions[i];
-        if (current.synchronized) {
-            buf = fmtf("case %zu: *pid0 = %zu; *lid0=%zu; *pid1 = %zu; *lid1 = %zu; return;", i,
-                current.first->get_process_gid(), current.first->get_state1_lid(),
-                current.second->get_process_gid(), current.second->get_state1_lid());
-            line(buf);
-        } else {
-            buf = fmtf("case %zu: *pid0 = %zu; *lid0 = %zu; *pid1 = -1; *lid1 = -1; return;", i, current.first->get_process_gid(), current.first->get_state1_lid());
-            line(buf);
-        }
-    }
-    block_end();
-    line("*pid0 = *lid0 = -1;");
-    line("*pid1 = *lid0 = -1;");
-    line("return;");
-    block_end();
-    line();
-
     line("static int wrapped_div(int denom, jmp_buf* jbuf)");
     block_begin();
     line("if(denom == 0) longjmp(*jbuf, 1);");
