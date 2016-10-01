@@ -2464,6 +2464,8 @@ void dve_compiler::gen_transition_info()
     block_end();
     line();
 
+    line("#pragma clang diagnostic push");
+    line("#pragma clang diagnostic ignored \"-Waddress-of-array-temporary\"");
     buf = fmtf("int* guards_per_transition[%zu] = ", transitions.size() );
     line(buf);
     block_begin();
@@ -2482,9 +2484,10 @@ void dve_compiler::gen_transition_info()
             line(buf);
         }
     block_end();
-    line(";");
+    line(";");    
+    line("#pragma clang diagnostic pop");
     line();
-
+    
     // export the guards per transition group
     line ("extern \"C\" const int* get_guards(int t) " );
     block_begin();
