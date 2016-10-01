@@ -35,7 +35,7 @@ before_install:
 #- if [ "$TRAVIS_OS_NAME" = "osx" ]; then brew install cmake; fi
 
 before_script:
-- if [ "$CC" = "gcc" ]; then export CC=gcc-4.9; fi
+- if [ "$CC" = "gcc" ]; then export CC=gcc-4.9; export LDFLAGS="-static-libgcc -static-libstdc++"; fi
 - if [ "$CXX" = "g++" ]; then export CXX=g++-4.9; fi
 
 script:
