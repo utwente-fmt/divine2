@@ -171,6 +171,8 @@ void dve_compiler::gen_header()
     line( "#include <stdint.h>" );
     line( "#include <setjmp.h>" );
     line();
+    line( "#pragma clang diagnostic ignored \"-Wparentheses-equality\"" );
+    line();
 
     if (ltsmin) {
         // note: everything is 32 bit, this introduces a bug
