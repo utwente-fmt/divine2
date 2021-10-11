@@ -140,7 +140,7 @@ struct Map : Algorithm, DomainWorker< Map< G, _Statistics > >
         short iteration:14;
         // elim: 0 = candidate for elimination, 1 = not a canditate, 2 = eliminated
         short elim:2;
-        VertexId map;
+        VertexId xmap;
         VertexId oldmap;
     };
 
@@ -218,7 +218,7 @@ struct Map : Algorithm, DomainWorker< Map< G, _Statistics > >
         if ( !extension( t ).parent.valid() )
             extension( t ).parent = f;
 
-        if ( isAccepting( t ) && extension( f ).map == makeId( t ) ) {
+        if ( isAccepting( t ) && extension( f ).xmap == makeId( t ) ) {
             shared.ce.initial = t;
             return visitor::TerminateOnTransition;
         }
@@ -228,15 +228,15 @@ struct Map : Algorithm, DomainWorker< Map< G, _Statistics > >
                 return updateIteration( t );
 
         if ( isAccepting( t ) )
-            extension( t ).map = std::max( extension( t ).map, makeId( t ) );
-        VertexId map = std::max( extension( f ).map, extension( t ).map );
+            extension( t ).xmap = std::max( extension( t ).xmap, makeId( t ) );
+        auto some_map = std::max( extension( f ).xmap, extension( t ).xmap );
 
-        if ( extension( t ).map < map ) {
+        if ( extension( t ).xmap < (some_map) ) {
             // we are *not* the MAP of our successors anymore, so not a
             // candidate for elimination (shrinking), remove from set
             if ( isAccepting( t ) && extension( t ).elim )
                 extension( t ).elim = 1;
-            extension( t ).map = map;
+            extension( t ).xmap = some_map;
             return visitor::ExpandTransition;
         }
 
@@ -260,8 +260,8 @@ struct Map : Algorithm, DomainWorker< Map< G, _Statistics > >
         for ( size_t i = 0; i < table().size(); ++i ) {
             Node st = table()[ i ].key;
             if ( st.valid() ) {
-                extension( st ).oldmap = extension( st ).map;
-                extension( st ).map = VertexId();
+                extension( st ).oldmap = extension( st ).xmap;
+                extension( st ).xmap = VertexId();
                 if ( isAccepting( st ) ) {
                     /* elim == 1 means NOT to be eliminated (!) */
                     if ( extension( st ).elim == 1 )

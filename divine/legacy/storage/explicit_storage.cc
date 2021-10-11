@@ -672,7 +672,7 @@ void* explicit_storage_t::app_by_ref(state_ref_t refer)
     {
       errvec <<"Invalid reference used in set_app_by_ref()."
 	     <<psh(EXPLICIT_STORAGE_ERR_TYPE);
-      return false;
+      return (void*)false;
     }
   else
     {
@@ -680,7 +680,7 @@ void* explicit_storage_t::app_by_ref(state_ref_t refer)
 	{
 	  errvec <<"Invalid reference used in set_app_by_ref()."
 		 <<psh(EXPLICIT_STORAGE_ERR_TYPE);
-	  return false;
+	  return (void*)false;
 	}
       else
 	{
